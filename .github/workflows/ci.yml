@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync
+
+      - name: Build project assets (Extensions + JupyterLite)
+        run: npm run build
+
+      - name: Verify build artifacts
+        run: |
+          test -f jupyterlite/index.html || (echo "Missing jupyterlite/index.html" && exit 1)
+          test -f jupyterlite/jupyter-lite.json || (echo "Missing jupyterlite/jupyter-lite.json" && exit 1)
+          echo "All build artifacts verified successfully."
