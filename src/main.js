@@ -181,7 +181,9 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json'
 };
 
-function startLocalServer(rootDir) {
+const DEFAULT_PORT = 58888;
+
+function startLocalServer(rootDir, preferredPort = DEFAULT_PORT) {
   return new Promise((resolve, reject) => {
     server = http.createServer((req, res) => {
       try {
@@ -230,14 +232,26 @@ function startLocalServer(rootDir) {
       }
     });
 
-    // ポート 0 を指定して空いているポートを自動取得
-    server.listen(0, '127.0.0.1', () => {
-      serverPort = server.address().port;
-      log('MAIN', `Local Server started on http://127.0.0.1:${serverPort}`);
-      resolve(serverPort);
+    // IndexedDBの同一オリジン(Same-Origin)維持のため、固定ポートを優先バインド
+    const tryListen = (portToTry) => {
+      server.listen(portToTry, '127.0.0.1', () => {
+        serverPort = server.address().port;
+        log('MAIN', `Local Server started on http://127.0.0.1:${serverPort}`);
+        resolve(serverPort);
+      });
+    };
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        log('MAIN', `Port ${preferredPort} is in use, trying next port...`);
+        preferredPort++;
+        tryListen(preferredPort);
+      } else {
+        reject(err);
+      }
     });
 
-    server.on('error', reject);
+    tryListen(preferredPort);
   });
 }
 
@@ -411,8 +425,10 @@ function setupApplicationMenu(mainWindow) {
   Menu.setApplicationMenu(menu);
 }
 
+let mainWindow = null;
+
 function createWindow(port) {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 850,
     title: 'Electron Jupyter Sandbox',
@@ -427,36 +443,53 @@ function createWindow(port) {
   });
 
   // レンダラープロセスのコンソールログをターミナルおよびapp.logに出力
-  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
     log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
   });
 
   // アプリケーションメニューの構築
-  setupApplicationMenu(win);
+  setupApplicationMenu(mainWindow);
 
   // ローカルHTTPサーバー経由でJupyterLabをロード
-  win.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
+  mainWindow.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
-app.whenReady().then(async () => {
-  initLogger();
+// 二重起動防止（ポート競合・オリジン分散を防止）
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
 
-  const rootDir = app.isPackaged
-    ? path.join(app.getAppPath(), 'jupyterlite')
-    : path.resolve(__dirname, '../jupyterlite');
+  app.whenReady().then(async () => {
+    initLogger();
 
-  log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`);
+    const rootDir = app.isPackaged
+      ? path.join(app.getAppPath(), 'jupyterlite')
+      : path.resolve(__dirname, '../jupyterlite');
 
-  // 1. ローカル配信HTTPサーバーの起動
-  const port = await startLocalServer(rootDir);
+    log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`);
 
-  // 2. ネットワーク完全隔離 (デフォルトセッションおよび永続セッション両方で外部通信を遮断)
-  applyNetworkFilter(session.defaultSession);
-  applyNetworkFilter(session.fromPartition('persist:jupyter-data'));
+    // 1. ローカル配信HTTPサーバーの起動
+    const port = await startLocalServer(rootDir);
 
-  createWindow(port);
-});
+    // 2. ネットワーク完全隔離 (デフォルトセッションおよび永続セッション両方で外部通信を遮断)
+    applyNetworkFilter(session.defaultSession);
+    applyNetworkFilter(session.fromPartition('persist:jupyter-data'));
+
+    createWindow(port);
+  });
+}
 
 // 4. ファイル I/O 用の IPC ハンドラー
 ipcMain.handle('dialog:openFile', async () => {
