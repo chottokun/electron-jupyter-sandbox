@@ -1,19 +1,130 @@
-const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const url = require('url');
 const http = require('http');
 
+// アプリケーションのベースディレクトリ解決
+const appRootDir = app.isPackaged
+  ? path.dirname(app.getPath('exe'))
+  : path.resolve(__dirname, '..');
+
+const configFilePath = path.join(appRootDir, 'config.json');
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(configFilePath)) {
+      const raw = fs.readFileSync(configFilePath, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read config.json:', err);
+  }
+  return {};
+}
+
+function saveConfig(updates) {
+  try {
+    const current = loadConfig();
+    const merged = { ...current, ...updates };
+    fs.writeFileSync(configFilePath, JSON.stringify(merged, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('Failed to write config.json:', err);
+    return false;
+  }
+}
+
+function getResolvedDataDir() {
+  const config = loadConfig();
+  if (config.dataDir) {
+    return path.isAbsolute(config.dataDir)
+      ? config.dataDir
+      : path.resolve(appRootDir, config.dataDir);
+  }
+  return path.join(appRootDir, 'data');
+}
+
+// 起動初期（app.whenReady前）に userData を設定して永続化ディレクトリを決定
+const currentDataDir = getResolvedDataDir();
+try {
+  if (!fs.existsSync(currentDataDir)) {
+    fs.mkdirSync(currentDataDir, { recursive: true });
+  }
+  app.setPath('userData', currentDataDir);
+} catch (e) {
+  console.error('Failed to initialize data directory:', e);
+}
+
 let server = null;
 let serverPort = 0;
 
 let logFilePath = null;
+let logDirPath = null;
+let settingsDirPath = null;
+let overridesFilePath = null;
+
+function getSettingsDir() {
+  if (!settingsDirPath) {
+    settingsDirPath = path.join(currentDataDir, 'settings');
+    try {
+      if (!fs.existsSync(settingsDirPath)) {
+        fs.mkdirSync(settingsDirPath, { recursive: true });
+      }
+    } catch (e) {
+      console.error('Failed to create settings directory:', e);
+    }
+  }
+  return settingsDirPath;
+}
+
+function getOverridesPath() {
+  if (!overridesFilePath) {
+    const dir = getSettingsDir();
+    overridesFilePath = path.join(dir, 'overrides.json');
+    try {
+      if (!fs.existsSync(overridesFilePath)) {
+        fs.writeFileSync(overridesFilePath, '{\n  "@jupyterlab/apputils-extension:themes": {\n    "theme": "JupyterLab Dark"\n  }\n}\n', 'utf-8');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return overridesFilePath;
+}
+
+function loadOverrides() {
+  try {
+    const filePath = getOverridesPath();
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    log('SERVER ERROR', `Failed to parse overrides.json: ${e.message}`);
+  }
+  return null;
+}
+
+function getLogDir() {
+  if (!logDirPath) {
+    logDirPath = path.join(currentDataDir, 'logs');
+    try {
+      if (!fs.existsSync(logDirPath)) {
+        fs.mkdirSync(logDirPath, { recursive: true });
+      }
+    } catch (e) {
+      console.error('Failed to create logs directory:', e);
+    }
+  }
+  return logDirPath;
+}
 
 function getLogPath() {
   if (!logFilePath) {
     try {
-      const baseDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..');
-      logFilePath = path.join(baseDir, 'app.log');
+      const dir = getLogDir();
+      logFilePath = path.join(dir, 'app.log');
     } catch (e) {
       logFilePath = null;
     }
@@ -114,7 +225,9 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json'
 };
 
-function startLocalServer(rootDir) {
+const DEFAULT_PORT = 58888;
+
+function startLocalServer(rootDir, preferredPort = DEFAULT_PORT) {
   return new Promise((resolve, reject) => {
     server = http.createServer((req, res) => {
       try {
@@ -154,6 +267,24 @@ function startLocalServer(rootDir) {
           'Cache-Control': 'no-cache'
         });
 
+        // jupyter-lite.json の場合、dataDir/settings/overrides.json の設定を動的にマージして配信
+        if (path.basename(filePath) === 'jupyter-lite.json') {
+          try {
+            const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            const userOverrides = loadOverrides();
+            if (userOverrides) {
+              baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
+              baseContent['jupyter-config-data']['settingsOverrides'] = {
+                ...(baseContent['jupyter-config-data']['settingsOverrides'] || {}),
+                ...userOverrides
+              };
+            }
+            return res.end(JSON.stringify(baseContent, null, 2));
+          } catch (err) {
+            log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);
+          }
+        }
+
         const stream = fs.createReadStream(filePath);
         stream.pipe(res);
       } catch (err) {
@@ -163,19 +294,226 @@ function startLocalServer(rootDir) {
       }
     });
 
-    // ポート 0 を指定して空いているポートを自動取得
-    server.listen(0, '127.0.0.1', () => {
-      serverPort = server.address().port;
-      log('MAIN', `Local Server started on http://127.0.0.1:${serverPort}`);
-      resolve(serverPort);
+    // IndexedDBの同一オリジン(Same-Origin)維持のため、固定ポートを優先バインド
+    const tryListen = (portToTry) => {
+      server.listen(portToTry, '127.0.0.1', () => {
+        serverPort = server.address().port;
+        log('MAIN', `Local Server started on http://127.0.0.1:${serverPort}`);
+        resolve(serverPort);
+      });
+    };
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        log('MAIN', `Port ${preferredPort} is in use, trying next port...`);
+        preferredPort++;
+        tryListen(preferredPort);
+      } else {
+        reject(err);
+      }
     });
 
-    server.on('error', reject);
+    tryListen(preferredPort);
   });
 }
 
+function applyNetworkFilter(targetSession) {
+  targetSession.webRequest.onBeforeRequest((details, callback) => {
+    try {
+      const parsed = new URL(details.url);
+      const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+      const isInternal = parsed.protocol === 'devtools:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:';
+
+      if (isInternal || isLocal) {
+        callback({ cancel: false });
+      } else {
+        log('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
+        callback({ cancel: true });
+      }
+    } catch (e) {
+      log('SECURITY BLOCKED', `無効なURL要求を遮断しました: ${details.url}`);
+      callback({ cancel: true });
+    }
+  });
+}
+
+async function changeDataDirectory(parentWin) {
+  const current = getResolvedDataDir();
+  const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
+    title: 'データ保存先ディレクトリを選択',
+    defaultPath: current,
+    properties: ['openDirectory', 'createDirectory']
+  });
+
+  if (canceled || filePaths.length === 0) return;
+
+  const selectedPath = filePaths[0];
+  const success = saveConfig({ dataDir: selectedPath });
+
+  if (success) {
+    const response = await dialog.showMessageBox(parentWin, {
+      type: 'question',
+      buttons: ['今すぐ再起動', 'あとで手動で再起動'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '設定の更新',
+      message: 'データ保存先フォルダを更新しました。',
+      detail: `新しい保存先:\n${selectedPath}\n\n※ 変更を反映するにはアプリケーションの再起動が必要です。今すぐ再起動しますか？`
+    });
+
+    if (response.response === 0) {
+      app.relaunch();
+      app.exit(0);
+    }
+  } else {
+    dialog.showErrorBox('設定保存エラー', 'config.json への書き込みに失敗しました。');
+  }
+}
+
+function setupApplicationMenu(mainWindow) {
+  const isMac = process.platform === 'darwin';
+
+  const template = [
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about', label: `${app.name} について` },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide', label: `${app.name} を隠す` },
+        { role: 'hideOthers', label: 'ほかを隠す`' },
+        { role: 'unhide', label: 'すべて表示' },
+        { type: 'separator' },
+        { role: 'quit', label: `${app.name} を終了` }
+      ]
+    }] : []),
+    {
+      label: 'ファイル',
+      submenu: [
+        isMac ? { role: 'close', label: 'ウィンドウを閉じる' } : { role: 'quit', label: '終了' }
+      ]
+    },
+    {
+      label: '編集',
+      submenu: [
+        { role: 'undo', label: '元に戻す' },
+        { role: 'redo', label: 'やり直す' },
+        { type: 'separator' },
+        { role: 'cut', label: '切り取り' },
+        { role: 'copy', label: 'コピー' },
+        { role: 'paste', label: '貼り付け' },
+        { role: 'selectAll', label: 'すべて選択' }
+      ]
+    },
+    {
+      label: '表示',
+      submenu: [
+        { role: 'reload', label: '再読み込み' },
+        { role: 'forceReload', label: '強制再読み込み' },
+        { role: 'toggleDevTools', label: '開発者ツール' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: '実際のサイズ' },
+        { role: 'zoomIn', label: '拡大' },
+        { role: 'zoomOut', label: '縮小' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'フルスクリーン切り替え' }
+      ]
+    },
+    {
+      label: '設定',
+      submenu: [
+        {
+          label: 'データ保存先フォルダを変更...',
+          click: async () => {
+            await changeDataDirectory(mainWindow);
+          }
+        },
+        {
+          label: 'データ保存先フォルダを開く (エクスプローラー)',
+          click: async () => {
+            const dataDir = getResolvedDataDir();
+            if (fs.existsSync(dataDir)) {
+              await shell.openPath(dataDir);
+            } else {
+              dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${dataDir}`);
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Jupyter設定ファイルを開く (overrides.json)',
+          click: async () => {
+            const overridesPath = getOverridesPath();
+            if (overridesPath && fs.existsSync(overridesPath)) {
+              await shell.openPath(overridesPath);
+            } else {
+              dialog.showErrorBox('エラー', '設定ファイルが見つかりません。');
+            }
+          }
+        },
+        {
+          label: 'Jupyter設定フォルダを開く',
+          click: async () => {
+            const settingsDir = getSettingsDir();
+            if (fs.existsSync(settingsDir)) {
+              await shell.openPath(settingsDir);
+            } else {
+              dialog.showErrorBox('エラー', `設定フォルダが存在しません: ${settingsDir}`);
+            }
+          }
+        }
+      ]
+    },
+    {
+      label: 'ヘルプ',
+      submenu: [
+        {
+          label: 'ログファイルを開く (app.log)',
+          click: async () => {
+            const logPath = getLogPath();
+            if (logPath && fs.existsSync(logPath)) {
+              await shell.openPath(logPath);
+            } else {
+              dialog.showErrorBox('エラー', 'ログファイルがまだ作成されていないか、存在しません。');
+            }
+          }
+        },
+        {
+          label: 'ログフォルダを開く',
+          click: async () => {
+            const logDir = getLogDir();
+            if (fs.existsSync(logDir)) {
+              await shell.openPath(logDir);
+            } else {
+              dialog.showErrorBox('エラー', `ログフォルダが存在しません: ${logDir}`);
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'バージョン・環境情報',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'Electron Jupyter Sandbox',
+              message: 'Electron Jupyter Sandbox v1.0.0',
+              detail: `現在のデータ保存先:\n${getResolvedDataDir()}\n\nログ保存先:\n${getLogPath()}\n\n・完全隔離型 WebAssembly (Pyodide) 実行環境\n・オフライン保証 (外部通信完全遮断)`
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
+let mainWindow = null;
+
 function createWindow(port) {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 850,
     title: 'Electron Jupyter Sandbox',
@@ -184,51 +522,59 @@ function createWindow(port) {
       contextIsolation: true,
       webSecurity: true,
       sandbox: true,
+      partition: 'persist:jupyter-data',
       preload: path.join(__dirname, 'preload.js')
     }
   });
 
   // レンダラープロセスのコンソールログをターミナルおよびapp.logに出力
-  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
     log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
   });
 
-  // 開発・デバッグ用（必要に応じて Ctrl+Shift+I で開くか、以下のコメントを外してください）
-  // win.webContents.openDevTools();
+  // アプリケーションメニューの構築
+  setupApplicationMenu(mainWindow);
 
   // ローカルHTTPサーバー経由でJupyterLabをロード
-  win.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
+  mainWindow.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
-app.whenReady().then(async () => {
-  initLogger();
-
-  const rootDir = app.isPackaged
-    ? path.join(app.getAppPath(), 'jupyterlite')
-    : path.resolve(__dirname, '../jupyterlite');
-
-  log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir})`);
-
-  // 1. ローカル配信HTTPサーバーの起動
-  const port = await startLocalServer(rootDir);
-
-  // 2. ネットワーク完全隔離 (127.0.0.1 以外の外部通信をすべて遮断)
-  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-    const parsed = new URL(details.url);
-    const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
-    const isInternal = parsed.protocol === 'devtools:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:';
-
-    if (isInternal || isLocal) {
-      callback({ cancel: false });
-    } else {
-      log('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
-      callback({ cancel: true });
+// 二重起動防止（ポート競合・オリジン分散を防止）
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
 
-  createWindow(port);
-});
+  app.whenReady().then(async () => {
+    initLogger();
+
+    const rootDir = app.isPackaged
+      ? path.join(app.getAppPath(), 'jupyterlite')
+      : path.resolve(__dirname, '../jupyterlite');
+
+    log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`);
+
+    // 1. ローカル配信HTTPサーバーの起動
+    const port = await startLocalServer(rootDir);
+
+    // 2. ネットワーク完全隔離 (デフォルトセッションおよび永続セッション両方で外部通信を遮断)
+    applyNetworkFilter(session.defaultSession);
+    applyNetworkFilter(session.fromPartition('persist:jupyter-data'));
+
+    createWindow(port);
+  });
+}
 
 // 4. ファイル I/O 用の IPC ハンドラー
 ipcMain.handle('dialog:openFile', async () => {
