@@ -239,11 +239,12 @@ function startLocalServer(rootDir, preferredPort = DEFAULT_PORT) {
           relativePath = '/lab/index.html';
         }
 
-        // パストラバーサル対策
-        const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
-        const filePath = path.join(rootDir, safePath);
+        // パストラバーサル対策（`path.relative` による厳格なルート配下検証）
+        const normalizedRel = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
+        const filePath = path.resolve(rootDir, '.' + (normalizedRel.startsWith('/') ? normalizedRel : '/' + normalizedRel));
+        const relFromRoot = path.relative(rootDir, filePath);
 
-        if (!filePath.startsWith(rootDir)) {
+        if (relFromRoot.startsWith('..') || path.isAbsolute(relFromRoot)) {
           log('HTTP 403', `Access Denied: ${relativePath}`);
           res.writeHead(403);
           return res.end('Access Denied');

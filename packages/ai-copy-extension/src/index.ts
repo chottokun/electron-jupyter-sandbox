@@ -9,8 +9,8 @@ const aiCopyPlugin: JupyterFrontEndPlugin<void> = {
   requires: [INotebookTracker],
   activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {
 
-    const setupCellObserver = (cellModel: any, nbPanel: NotebookPanel) => {
-      if (cellModel.type === 'code') {
+    const setupCellObserver = (cellModel: unknown, nbPanel: NotebookPanel) => {
+      if (cellModel && typeof cellModel === 'object' && 'type' in cellModel && (cellModel as { type: string }).type === 'code') {
         const codeCellModel = cellModel as ICodeCellModel;
         codeCellModel.outputs.changed.connect((outputsList) => {
           let errorOutput: IOutputModel | undefined;
@@ -23,7 +23,7 @@ const aiCopyPlugin: JupyterFrontEndPlugin<void> = {
           }
           if (!errorOutput) return;
 
-          const cellWidget = nbPanel.content.widgets.find(w => w.model.id === cellModel.id) as CodeCell;
+          const cellWidget = nbPanel.content.widgets.find(w => w.model.id === codeCellModel.id) as CodeCell | undefined;
           if (!cellWidget) return;
 
           attachAICopyButton(cellWidget, errorOutput);
@@ -67,33 +67,39 @@ function attachAICopyButton(cellWidget: CodeCell, errorOutput: IOutputModel) {
   btn.style.cursor = 'pointer';
 
   btn.onclick = async () => {
-    // ボタンクリック時点で最新のコードを取得
-    const sourceCode = cellWidget.model.sharedModel.getSource();
+    try {
+      // ボタンクリック時点で最新のコードを取得
+      const sourceCode = cellWidget.model.sharedModel.getSource();
 
-    const errorJson = errorOutput.toJSON() as any;
-    // トレースバックの整形（ANSIカラーコードを除去）
-    const traceback = Array.isArray(errorJson?.traceback)
-      ? errorJson.traceback.join('\n').replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
-      : `${errorJson?.ename || 'Error'}: ${errorJson?.evalue || ''}`;
+      const errorJson = errorOutput.toJSON() as { traceback?: string[]; ename?: string; evalue?: string };
+      // トレースバックの整形（ANSIカラーコードを除去）
+      const traceback = Array.isArray(errorJson?.traceback)
+        ? errorJson.traceback.join('\n').replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
+        : `${errorJson?.ename || 'Error'}: ${errorJson?.evalue || ''}`;
 
-    const prompt = [
-      '以下のJupyter (Python/Pyodide WASM) 環境でコード実行時にエラーが発生しました。',
-      '原因の解説と、修正したコードを提示してください。',
-      '',
-      '【実行コード】',
-      '```python',
-      sourceCode,
-      '```',
-      '',
-      '【エラー内容 / トレースバック】',
-      '```text',
-      traceback,
-      '```'
-    ].join('\n');
+      const prompt = [
+        '以下のJupyter (Python/Pyodide WASM) 環境でコード実行時にエラーが発生しました。',
+        '原因の解説と、修正したコードを提示してください。',
+        '',
+        '【実行コード】',
+        '```python',
+        sourceCode,
+        '```',
+        '',
+        '【エラー内容 / トレースバック】',
+        '```text',
+        traceback,
+        '```'
+      ].join('\n');
 
-    await navigator.clipboard.writeText(prompt);
-    btn.innerText = '✅ コピー完了！';
-    setTimeout(() => { btn.innerText = '🤖 AI用にエラーをコピー'; }, 2500);
+      await navigator.clipboard.writeText(prompt);
+      btn.innerText = '✅ コピー完了！';
+      setTimeout(() => { btn.innerText = '🤖 AI用にエラーをコピー'; }, 2500);
+    } catch (err) {
+      console.error('Failed to copy AI error prompt:', err);
+      btn.innerText = '❌ コピー失敗';
+      setTimeout(() => { btn.innerText = '🤖 AI用にエラーをコピー'; }, 2500);
+    }
   };
 
   outputAreaNode.insertBefore(btn, outputAreaNode.firstChild);
