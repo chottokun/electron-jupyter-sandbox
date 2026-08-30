@@ -35,6 +35,19 @@ npm start
 
 ---
 
+## ⚠️ Windows SmartScreen・セキュリティ警告への案内
+
+未署名または新規署名のOSSバイナリでは、Windows SmartScreenによる「WindowsによってPCが保護されました」という青い警告画面が表示される場合があります。
+
+1. **初回起動手順**: 警告画面が表示されたら、「詳細情報」をクリックし、「実行」を選択してください。
+2. **ファイル整合性確認 (PowerShell)**: 配布バイナリの改ざんがないことを確認するには、PowerShellでハッシュ値を計算し、`SHA256SUMS.txt` と比較してください。
+
+```powershell
+Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
+```
+
+---
+
 ## 📁 ドキュメント一覧 (`docs/` - OKF v0.2 準拠)
 
 本プロジェクトの技術ドキュメントは、**Open Knowledge Format (OKF) v0.2** に準拠して体系化されています：
@@ -48,6 +61,7 @@ npm start
   - [Pyodide Wasm カーネル & 配信基盤 (`docs/components/pyodide-kernel.md`)](docs/components/pyodide-kernel.md)
 - 📋 **手順書 / プレイブック (`docs/playbooks/`)**
   - [Electron パッケージング手順書 (`docs/playbooks/packaging-guide.md`)](docs/playbooks/packaging-guide.md)
+  - [OSS配布における信頼性確保 & リリースガイド (`docs/playbooks/release-trust-guide.md`)](docs/playbooks/release-trust-guide.md)
   - [完全オフライン Wheel 追加手順書 (`docs/playbooks/offline-wheels.md`)](docs/playbooks/offline-wheels.md)
   - [JupyterLab UI 日本語化手順書 (`docs/playbooks/localization.md`)](docs/playbooks/localization.md)
 - 🛠️ **リファレンス (`docs/references/`)**
