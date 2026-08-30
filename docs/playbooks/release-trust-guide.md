@@ -54,17 +54,19 @@ CI内でVirusTotal APIを呼び出してスキャンを実行し、スキャン�
 
 ---
 
-## ⚠️ SmartScreen・セキュリティ警告へのユーザー向け案内
+## 📋 メンテナー向けリリース時運用チェックリスト
 
-未署名または新規署名のOSSバイナリでは、Windows SmartScreenによる「WindowsによってPCが保護されました」という青い警告画面が避けられない場合があります。これをトラブルではなく正常な仕様としてドキュメント化します。
+未署名または新規署名のOSSバイナリでは、Windows SmartScreenによる警告画面が表示される場合があります。リリース時にはメンテナーが以下の運用手順を実施することを推奨します。
 
-* **README / ドキュメントへの記載**
-* **初回起動方法**: 「詳細情報」をクリックし、「実行」を選択する手順を案内する。
-* **整合性確認手順**: ユーザー自身がPowerShellでハッシュ値を検証できるコマンドを提示する。
+### 1. ユーザー向けガイドの確認・周知
+* READMEやリリースノートに、初回起動手順（「詳細情報」→「実行」）およびPowerShellハッシュ検証手順（`Get-FileHash`）が記載されていることを確認します。
 
 ```powershell
 Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
 ```
 
-* **Microsoftへの誤検知報告（False Positive Submission）**
-リリース直後、Microsoft Security Intelligence（開発者向け誤検知申請フォーム）からバイナリを送信することで、数日以内にWindows Defenderでの安全判定が反映されます。
+### 2. Microsoftへの誤検知申請（False Positive Submission）手順
+新規リリース直後、必要に応じて以下の手順で Microsoft にバイナリを送信し、安全判定を促進させます。
+1. **申請フォームにアクセス**: [Microsoft Security Intelligence 誤検知申請ポータル](https://www.microsoft.com/en-us/wdsi/filesubmission) にアクセスします。
+2. **ファイル送信**: 「Software Developer」を選択し、生成されたビルドバイナリ（`.exe`）を添付して送信します。
+3. **反映の確認**: 数日以内に Windows Defender / SmartScreen での安全判定が更新されます。
