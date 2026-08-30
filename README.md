@@ -33,6 +33,26 @@ npm run build
 npm start
 ```
 
+### 4. 配布用パッケージのビルド (`dist/` に出力)
+```bash
+# 事前アセットビルド (未実行の場合)
+npm run build
+
+# Linux 向け (AppImage)
+npm run package:linux
+
+# Windows 向け (インストーラー .exe / ポータブル .exe / zip)
+# ※ Linux 上で実行する場合は事前に sudo apt install -y wine が必要です
+npm run package:win
+
+# macOS 向け (dmg)
+npm run package:mac
+```
+
+> [!TIP]
+> **GitHub Actions による自動ビルド（推奨）**
+> `v1.0.0` 等の Git タグをプッシュ（または `gh workflow run release.yml` を実行）すると、Windows 仮想マシン上でインストーラーおよびポータブル版が自動ビルドされ、[GitHub Releases](https://github.com/chottokun/electron-jupyter-sandbox/releases) に自動公開されます。
+
 ---
 
 ## ⚠️ Windows SmartScreen・セキュリティ警告への案内
