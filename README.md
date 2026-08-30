@@ -9,7 +9,7 @@ WebAssembly (Pyodide) ベースの **JupyterLite** を **Electron** でラップ
 ## 🚀 クイックスタート
 
 ### 1. 前提条件
-- Node.js (Volta による管理推奨: `node@20.18.0`, `npm@10.8.2`)
+- Node.js (Volta による管理推奨: `node@22.14.0`, `npm@10.9.2`)
 - Python & `uv` (JupyterLite ビルドツール管理)
 
 ### 2. インストール & ビルド

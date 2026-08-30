@@ -22,8 +22,8 @@ generated:
 | レイヤー / コンポーネント | パッケージ名 | 推奨・検証済みバージョン | 備考 |
 |---|---|---|---|
 | **ランタイム管理 (Node)** | Volta | `2.0.2` | `package.json` でバージョン固定 |
-| **Node.js** | Node | `20.18.0` (LTS) | Electron 33 系と互換 |
-| **パッケージマネージャー** | npm | `10.8.2` | workspaces 機能でパッケージ分離 |
+| **Node.js** | Node | `22.14.0` (LTS) | JupyterLab builder (`^20.19.0 || >=22.12.0`) & Electron 互換 |
+| **パッケージマネージャー** | npm | `10.9.2` | workspaces 機能でパッケージ分離 |
 | **デスクトップ基盤** | Electron | `^33.2.0` (33.4.11) | Chromium 130 相当 |
 | **パッケージング** | electron-builder | `^25.1.8` | Linux(AppImage)/Win/Mac 対応 |
 | **Python 管理** | uv | `>=0.4.0` | `.venv` / `pyproject.toml` ローカル管理 |
