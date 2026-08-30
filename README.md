@@ -81,6 +81,7 @@ Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
   - [Pyodide Wasm カーネル & 配信基盤 (`docs/components/pyodide-kernel.md`)](docs/components/pyodide-kernel.md)
 - 📋 **手順書 / プレイブック (`docs/playbooks/`)**
   - [Electron パッケージング手順書 (`docs/playbooks/packaging-guide.md`)](docs/playbooks/packaging-guide.md)
+  - [Electron メニュー・アイコンカスタマイズガイド (`docs/playbooks/menu-and-icon-guide.md`)](docs/playbooks/menu-and-icon-guide.md)
   - [OSS配布における信頼性確保 & リリースガイド (`docs/playbooks/release-trust-guide.md`)](docs/playbooks/release-trust-guide.md)
   - [完全オフライン Wheel 追加手順書 (`docs/playbooks/offline-wheels.md`)](docs/playbooks/offline-wheels.md)
   - [JupyterLab UI 日本語化手順書 (`docs/playbooks/localization.md`)](docs/playbooks/localization.md)

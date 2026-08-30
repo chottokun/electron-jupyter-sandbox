@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { createApplicationMenu, setupContextMenu } = require('./menu');
 const url = require('url');
 const http = require('http');
 
@@ -175,10 +176,12 @@ function startLocalServer(rootDir) {
 }
 
 function createWindow(port) {
+  const iconPath = path.resolve(__dirname, '../build/icon.png');
   const win = new BrowserWindow({
     width: 1280,
     height: 850,
     title: 'Electron Jupyter Sandbox',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -187,6 +190,10 @@ function createWindow(port) {
       preload: path.join(__dirname, 'preload.js')
     }
   });
+
+  // アプリケーションメニューおよびコンテキストメニューの初期化
+  createApplicationMenu(win);
+  setupContextMenu(win);
 
   // レンダラープロセスのコンソールログをターミナルおよびapp.logに出力
   win.webContents.on('console-message', (event, level, message, line, sourceId) => {
