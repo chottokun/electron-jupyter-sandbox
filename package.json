@@ -20,6 +20,9 @@
   "build": {
     "appId": "com.example.electron-jupyter-sandbox",
     "productName": "JupyterSandbox",
+    "directories": {
+      "buildResources": "build"
+    },
     "files": [
       "src/**/*",
       "jupyterlite/**/*"
@@ -28,16 +31,24 @@
       "target": [
         "AppImage"
       ],
-      "category": "Development"
+      "category": "Development",
+      "icon": "build/icon.png"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "portable",
         "zip"
       ]
     },
+    "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "oneClick": false
+    },
     "mac": {
+      "icon": "build/icon.icns",
       "target": [
         "dmg"
       ]
