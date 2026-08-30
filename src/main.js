@@ -1,19 +1,86 @@
-const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const url = require('url');
 const http = require('http');
 
+// アプリケーションのベースディレクトリ解決
+const appRootDir = app.isPackaged
+  ? path.dirname(app.getPath('exe'))
+  : path.resolve(__dirname, '..');
+
+const configFilePath = path.join(appRootDir, 'config.json');
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(configFilePath)) {
+      const raw = fs.readFileSync(configFilePath, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read config.json:', err);
+  }
+  return {};
+}
+
+function saveConfig(updates) {
+  try {
+    const current = loadConfig();
+    const merged = { ...current, ...updates };
+    fs.writeFileSync(configFilePath, JSON.stringify(merged, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('Failed to write config.json:', err);
+    return false;
+  }
+}
+
+function getResolvedDataDir() {
+  const config = loadConfig();
+  if (config.dataDir) {
+    return path.isAbsolute(config.dataDir)
+      ? config.dataDir
+      : path.resolve(appRootDir, config.dataDir);
+  }
+  return path.join(appRootDir, 'data');
+}
+
+// 起動初期（app.whenReady前）に userData を設定して永続化ディレクトリを決定
+const currentDataDir = getResolvedDataDir();
+try {
+  if (!fs.existsSync(currentDataDir)) {
+    fs.mkdirSync(currentDataDir, { recursive: true });
+  }
+  app.setPath('userData', currentDataDir);
+} catch (e) {
+  console.error('Failed to initialize data directory:', e);
+}
+
 let server = null;
 let serverPort = 0;
 
 let logFilePath = null;
+let logDirPath = null;
+
+function getLogDir() {
+  if (!logDirPath) {
+    logDirPath = path.join(currentDataDir, 'logs');
+    try {
+      if (!fs.existsSync(logDirPath)) {
+        fs.mkdirSync(logDirPath, { recursive: true });
+      }
+    } catch (e) {
+      console.error('Failed to create logs directory:', e);
+    }
+  }
+  return logDirPath;
+}
 
 function getLogPath() {
   if (!logFilePath) {
     try {
-      const baseDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..');
-      logFilePath = path.join(baseDir, 'app.log');
+      const dir = getLogDir();
+      logFilePath = path.join(dir, 'app.log');
     } catch (e) {
       logFilePath = null;
     }
@@ -174,6 +241,176 @@ function startLocalServer(rootDir) {
   });
 }
 
+function applyNetworkFilter(targetSession) {
+  targetSession.webRequest.onBeforeRequest((details, callback) => {
+    try {
+      const parsed = new URL(details.url);
+      const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
+      const isInternal = parsed.protocol === 'devtools:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:';
+
+      if (isInternal || isLocal) {
+        callback({ cancel: false });
+      } else {
+        log('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
+        callback({ cancel: true });
+      }
+    } catch (e) {
+      log('SECURITY BLOCKED', `無効なURL要求を遮断しました: ${details.url}`);
+      callback({ cancel: true });
+    }
+  });
+}
+
+async function changeDataDirectory(parentWin) {
+  const current = getResolvedDataDir();
+  const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
+    title: 'データ保存先ディレクトリを選択',
+    defaultPath: current,
+    properties: ['openDirectory', 'createDirectory']
+  });
+
+  if (canceled || filePaths.length === 0) return;
+
+  const selectedPath = filePaths[0];
+  const success = saveConfig({ dataDir: selectedPath });
+
+  if (success) {
+    const response = await dialog.showMessageBox(parentWin, {
+      type: 'question',
+      buttons: ['今すぐ再起動', 'あとで手動で再起動'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '設定の更新',
+      message: 'データ保存先フォルダを更新しました。',
+      detail: `新しい保存先:\n${selectedPath}\n\n※ 変更を反映するにはアプリケーションの再起動が必要です。今すぐ再起動しますか？`
+    });
+
+    if (response.response === 0) {
+      app.relaunch();
+      app.exit(0);
+    }
+  } else {
+    dialog.showErrorBox('設定保存エラー', 'config.json への書き込みに失敗しました。');
+  }
+}
+
+function setupApplicationMenu(mainWindow) {
+  const isMac = process.platform === 'darwin';
+
+  const template = [
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about', label: `${app.name} について` },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide', label: `${app.name} を隠す` },
+        { role: 'hideOthers', label: 'ほかを隠す`' },
+        { role: 'unhide', label: 'すべて表示' },
+        { type: 'separator' },
+        { role: 'quit', label: `${app.name} を終了` }
+      ]
+    }] : []),
+    {
+      label: 'ファイル',
+      submenu: [
+        isMac ? { role: 'close', label: 'ウィンドウを閉じる' } : { role: 'quit', label: '終了' }
+      ]
+    },
+    {
+      label: '編集',
+      submenu: [
+        { role: 'undo', label: '元に戻す' },
+        { role: 'redo', label: 'やり直す' },
+        { type: 'separator' },
+        { role: 'cut', label: '切り取り' },
+        { role: 'copy', label: 'コピー' },
+        { role: 'paste', label: '貼り付け' },
+        { role: 'selectAll', label: 'すべて選択' }
+      ]
+    },
+    {
+      label: '表示',
+      submenu: [
+        { role: 'reload', label: '再読み込み' },
+        { role: 'forceReload', label: '強制再読み込み' },
+        { role: 'toggleDevTools', label: '開発者ツール' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: '実際のサイズ' },
+        { role: 'zoomIn', label: '拡大' },
+        { role: 'zoomOut', label: '縮小' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'フルスクリーン切り替え' }
+      ]
+    },
+    {
+      label: '設定',
+      submenu: [
+        {
+          label: 'データ保存先フォルダを変更...',
+          click: async () => {
+            await changeDataDirectory(mainWindow);
+          }
+        },
+        {
+          label: 'データ保存先フォルダを開く (エクスプローラー)',
+          click: async () => {
+            const dataDir = getResolvedDataDir();
+            if (fs.existsSync(dataDir)) {
+              await shell.openPath(dataDir);
+            } else {
+              dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${dataDir}`);
+            }
+          }
+        }
+      ]
+    },
+    {
+      label: 'ヘルプ',
+      submenu: [
+        {
+          label: 'ログファイルを開く (app.log)',
+          click: async () => {
+            const logPath = getLogPath();
+            if (logPath && fs.existsSync(logPath)) {
+              await shell.openPath(logPath);
+            } else {
+              dialog.showErrorBox('エラー', 'ログファイルがまだ作成されていないか、存在しません。');
+            }
+          }
+        },
+        {
+          label: 'ログフォルダを開く',
+          click: async () => {
+            const logDir = getLogDir();
+            if (fs.existsSync(logDir)) {
+              await shell.openPath(logDir);
+            } else {
+              dialog.showErrorBox('エラー', `ログフォルダが存在しません: ${logDir}`);
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'バージョン・環境情報',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'Electron Jupyter Sandbox',
+              message: 'Electron Jupyter Sandbox v1.0.0',
+              detail: `現在のデータ保存先:\n${getResolvedDataDir()}\n\nログ保存先:\n${getLogPath()}\n\n・完全隔離型 WebAssembly (Pyodide) 実行環境\n・オフライン保証 (外部通信完全遮断)`
+            });
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 function createWindow(port) {
   const win = new BrowserWindow({
     width: 1280,
@@ -184,6 +421,7 @@ function createWindow(port) {
       contextIsolation: true,
       webSecurity: true,
       sandbox: true,
+      partition: 'persist:jupyter-data',
       preload: path.join(__dirname, 'preload.js')
     }
   });
@@ -194,8 +432,8 @@ function createWindow(port) {
     log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
   });
 
-  // 開発・デバッグ用（必要に応じて Ctrl+Shift+I で開くか、以下のコメントを外してください）
-  // win.webContents.openDevTools();
+  // アプリケーションメニューの構築
+  setupApplicationMenu(win);
 
   // ローカルHTTPサーバー経由でJupyterLabをロード
   win.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
@@ -208,24 +446,14 @@ app.whenReady().then(async () => {
     ? path.join(app.getAppPath(), 'jupyterlite')
     : path.resolve(__dirname, '../jupyterlite');
 
-  log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir})`);
+  log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`);
 
   // 1. ローカル配信HTTPサーバーの起動
   const port = await startLocalServer(rootDir);
 
-  // 2. ネットワーク完全隔離 (127.0.0.1 以外の外部通信をすべて遮断)
-  session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
-    const parsed = new URL(details.url);
-    const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
-    const isInternal = parsed.protocol === 'devtools:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:';
-
-    if (isInternal || isLocal) {
-      callback({ cancel: false });
-    } else {
-      log('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
-      callback({ cancel: true });
-    }
-  });
+  // 2. ネットワーク完全隔離 (デフォルトセッションおよび永続セッション両方で外部通信を遮断)
+  applyNetworkFilter(session.defaultSession);
+  applyNetworkFilter(session.fromPartition('persist:jupyter-data'));
 
   createWindow(port);
 });
