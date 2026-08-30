@@ -32,13 +32,47 @@ function initLogger() {
   }
 }
 
+const LOG_MAX_SIZE = 2 * 1024 * 1024; // 2MB
+
+// パッケージ版でファイル記録する重要カテゴリ
+const CRITICAL_CATEGORIES = new Set([
+  'MAIN',
+  'FATAL ERROR',
+  'UNHANDLED REJECTION',
+  'SERVER ERROR',
+  'RENDERER ERROR',
+  'RENDERER WARN',
+  'SECURITY BLOCKED',
+  'STARTUP ERROR'
+]);
+
 function log(category, message) {
   const timestamp = new Date().toLocaleTimeString();
   const logLine = `[${timestamp}] [${category}] ${message}`;
   console.log(logLine);
+
+  // パッケージ版の場合は、重要イベント（起動情報・エラー・警告・セキュリティブロック）のみ保存
+  if (app.isPackaged) {
+    const isCritical = CRITICAL_CATEGORIES.has(category) || category.includes('ERROR') || category.includes('WARN');
+    if (!isCritical) {
+      return;
+    }
+  }
+
   try {
     const filePath = getLogPath();
     if (filePath) {
+      // ログローテーション（2MB超過時にバックアップして初期化）
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        if (stats.size > LOG_MAX_SIZE) {
+          try {
+            fs.renameSync(filePath, `${filePath}.old`);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
       fs.appendFileSync(filePath, logLine + '\n', 'utf-8');
     }
   } catch (e) {
