@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog, session, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const url = require('url');
 const http = require('http');
+const { createApplicationMenu, setupContextMenu } = require('./menu');
 
 // アプリケーションのベースディレクトリ解決
 const appRootDir = app.isPackaged
@@ -370,153 +371,60 @@ async function changeDataDirectory(parentWin) {
   }
 }
 
-function setupApplicationMenu(mainWindow) {
-  const isMac = process.platform === 'darwin';
+async function handleImportFile(parentWin) {
+  const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
+    title: 'インポートするノートブック / ファイルを選択',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Jupyter Notebook / Python / Data', extensions: ['ipynb', 'py', 'csv', 'json', 'txt'] },
+      { name: 'すべてのファイル', extensions: ['*'] }
+    ]
+  });
 
-  const template = [
-    ...(isMac ? [{
-      label: app.name,
-      submenu: [
-        { role: 'about', label: `${app.name} について` },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide', label: `${app.name} を隠す` },
-        { role: 'hideOthers', label: 'ほかを隠す`' },
-        { role: 'unhide', label: 'すべて表示' },
-        { type: 'separator' },
-        { role: 'quit', label: `${app.name} を終了` }
-      ]
-    }] : []),
-    {
-      label: 'ファイル',
-      submenu: [
-        isMac ? { role: 'close', label: 'ウィンドウを閉じる' } : { role: 'quit', label: '終了' }
-      ]
-    },
-    {
-      label: '編集',
-      submenu: [
-        { role: 'undo', label: '元に戻す' },
-        { role: 'redo', label: 'やり直す' },
-        { type: 'separator' },
-        { role: 'cut', label: '切り取り' },
-        { role: 'copy', label: 'コピー' },
-        { role: 'paste', label: '貼り付け' },
-        { role: 'selectAll', label: 'すべて選択' }
-      ]
-    },
-    {
-      label: '表示',
-      submenu: [
-        { role: 'reload', label: '再読み込み' },
-        { role: 'forceReload', label: '強制再読み込み' },
-        { role: 'toggleDevTools', label: '開発者ツール' },
-        { type: 'separator' },
-        { role: 'resetZoom', label: '実際のサイズ' },
-        { role: 'zoomIn', label: '拡大' },
-        { role: 'zoomOut', label: '縮小' },
-        { type: 'separator' },
-        { role: 'togglefullscreen', label: 'フルスクリーン切り替え' }
-      ]
-    },
-    {
-      label: '設定',
-      submenu: [
-        {
-          label: 'データ保存先フォルダを変更...',
-          click: async () => {
-            await changeDataDirectory(mainWindow);
-          }
-        },
-        {
-          label: 'データ保存先フォルダを開く (エクスプローラー)',
-          click: async () => {
-            const dataDir = getResolvedDataDir();
-            if (fs.existsSync(dataDir)) {
-              await shell.openPath(dataDir);
-            } else {
-              dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${dataDir}`);
-            }
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Jupyter設定ファイルを開く (overrides.json)',
-          click: async () => {
-            const overridesPath = getOverridesPath();
-            if (overridesPath && fs.existsSync(overridesPath)) {
-              await shell.openPath(overridesPath);
-            } else {
-              dialog.showErrorBox('エラー', '設定ファイルが見つかりません。');
-            }
-          }
-        },
-        {
-          label: 'Jupyter設定フォルダを開く',
-          click: async () => {
-            const settingsDir = getSettingsDir();
-            if (fs.existsSync(settingsDir)) {
-              await shell.openPath(settingsDir);
-            } else {
-              dialog.showErrorBox('エラー', `設定フォルダが存在しません: ${settingsDir}`);
-            }
-          }
-        }
-      ]
-    },
-    {
-      label: 'ヘルプ',
-      submenu: [
-        {
-          label: 'ログファイルを開く (app.log)',
-          click: async () => {
-            const logPath = getLogPath();
-            if (logPath && fs.existsSync(logPath)) {
-              await shell.openPath(logPath);
-            } else {
-              dialog.showErrorBox('エラー', 'ログファイルがまだ作成されていないか、存在しません。');
-            }
-          }
-        },
-        {
-          label: 'ログフォルダを開く',
-          click: async () => {
-            const logDir = getLogDir();
-            if (fs.existsSync(logDir)) {
-              await shell.openPath(logDir);
-            } else {
-              dialog.showErrorBox('エラー', `ログフォルダが存在しません: ${logDir}`);
-            }
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'バージョン・環境情報',
-          click: () => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'Electron Jupyter Sandbox',
-              message: 'Electron Jupyter Sandbox v1.0.0',
-              detail: `現在のデータ保存先:\n${getResolvedDataDir()}\n\nログ保存先:\n${getLogPath()}\n\n・完全隔離型 WebAssembly (Pyodide) 実行環境\n・オフライン保証 (外部通信完全遮断)`
-            });
-          }
-        }
-      ]
+  if (canceled || filePaths.length === 0) return;
+
+  try {
+    const filePath = filePaths[0];
+    const fileName = path.basename(filePath);
+    const content = fs.readFileSync(filePath, 'utf-8');
+
+    if (parentWin && !parentWin.isDestroyed()) {
+      parentWin.webContents.send('app:import-file', { fileName, content, path: filePath });
     }
-  ];
+    log('MAIN', `File imported: ${filePath}`);
+  } catch (err) {
+    dialog.showErrorBox('インポートエラー', `ファイルの読み込みに失敗しました: ${err.message}`);
+  }
+}
 
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+async function handleExportFile(parentWin) {
+  const { canceled, filePath } = await dialog.showSaveDialog(parentWin, {
+    title: 'ノートブックのエクスポート先を選択',
+    defaultPath: 'notebook.ipynb',
+    filters: [
+      { name: 'Jupyter Notebook', extensions: ['ipynb'] },
+      { name: 'Python Script', extensions: ['py'] },
+      { name: 'すべてのファイル', extensions: ['*'] }
+    ]
+  });
+
+  if (canceled || !filePath) return;
+
+  if (parentWin && !parentWin.isDestroyed()) {
+    parentWin.webContents.send('app:request-export-data', { targetPath: filePath });
+  }
 }
 
 let mainWindow = null;
 
 function createWindow(port) {
+  const iconPath = path.resolve(__dirname, '../build/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 850,
     title: 'Electron Jupyter Sandbox',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -533,8 +441,35 @@ function createWindow(port) {
     log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
   });
 
-  // アプリケーションメニューの構築
-  setupApplicationMenu(mainWindow);
+  // JupyterLab の未保存ガード (beforeunload) によるクローズブロックを適切にハンドリング
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'question',
+      buttons: ['保存せずに終了', 'キャンセル'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '未保存の変更',
+      message: '未保存の変更がある可能性があります。',
+      detail: '保存せずにアプリケーションを終了しますか？'
+    });
+
+    if (choice === 0) {
+      event.preventDefault(); // アンロード阻止を解除して終了を許可
+    }
+  });
+
+  // アプリケーションメニューおよび右クリックコンテキストメニューの初期化
+  createApplicationMenu(mainWindow, {
+    changeDataDirectory,
+    getResolvedDataDir,
+    getOverridesPath,
+    getSettingsDir,
+    getLogPath,
+    getLogDir,
+    handleImportFile,
+    handleExportFile
+  });
+  setupContextMenu(mainWindow);
 
   // ローカルHTTPサーバー経由でJupyterLabをロード
   mainWindow.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
