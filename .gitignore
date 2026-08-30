@@ -1,0 +1,5 @@
+node_modules/
+dist/
+jupyterlite/
+.jupyterlite.doit.db
+*.log

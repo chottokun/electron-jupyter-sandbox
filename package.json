@@ -1,0 +1,38 @@
+{
+  "name": "electron-jupyter-sandbox",
+  "version": "1.0.0",
+  "description": "完全隔離型・AI連携デスクトップJupyter環境",
+  "main": "src/main.js",
+  "scripts": {
+    "build:ext": "tsc -p tsconfig.json",
+    "build:jupyter": "jupyter lite build --config jupyter_lite_config.json",
+    "build": "npm run build:ext && npm run build:jupyter",
+    "start": "electron .",
+    "package:win": "electron-builder --win --x64",
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "com.example.electron-jupyter-sandbox",
+    "productName": "JupyterSandbox",
+    "files": [
+      "src/**/*",
+      "jupyterlite/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@jupyterlab/application": "^4.6.3",
+    "@jupyterlab/cells": "^4.6.3",
+    "@jupyterlab/notebook": "^4.6.3",
+    "@jupyterlab/rendermime": "^4.6.3",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
+  }
+}

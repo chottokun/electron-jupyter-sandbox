@@ -1,0 +1,7 @@
+{
+  "LiteBuildConfig": {
+    "output_dir": "jupyterlite",
+    "apps": ["lab"],
+    "federated_extensions": []
+  }
+}
