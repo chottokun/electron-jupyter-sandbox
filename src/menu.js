@@ -17,7 +17,9 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     getOverridesPath = () => '',
     getSettingsDir = () => '',
     getLogPath = () => '',
-    getLogDir = () => ''
+    getLogDir = () => '',
+    handleImportFile = async () => {},
+    handleExportFile = async () => {}
   } = handlers;
 
   const template = [
@@ -46,27 +48,23 @@ function createApplicationMenu(mainWindow, handlers = {}) {
       label: 'ファイル',
       submenu: [
         {
-          label: 'ファイルを開く...',
+          label: 'ノートブックをインポート (.ipynb)...',
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu:open-file');
-            }
+            await handleImportFile(mainWindow);
           }
         },
         {
-          label: '保存...',
-          accelerator: 'CmdOrCtrl+S',
+          label: 'ノートブックをエクスポート...',
+          accelerator: 'CmdOrCtrl+Shift+S',
           click: async () => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              mainWindow.webContents.send('menu:save-file');
-            }
+            await handleExportFile(mainWindow);
           }
         },
         { type: 'separator' },
         isMac
           ? { role: 'close', label: 'ウィンドウを閉じる' }
-          : { role: 'quit', label: '終了' }
+          : { role: 'quit', label: '終了', accelerator: 'CmdOrCtrl+Q' }
       ]
     },
 

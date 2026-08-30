@@ -27,9 +27,17 @@ JupyterLite を Electron でラップする構成において、デスクトッ�
 ### 1.1 OS別アプリケーションメニューの定義 (`src/menu.js`)
 - **macOS要件**: macOSではアプリケーションメニューに標準ロール（`undo`, `copy`, `paste`, `selectAll` など）を記述しないと、`Cmd+C` や `Cmd+V` などのキーボードショートカットが動作しません。
 - **マルチプラットフォーム分岐**: `process.platform === 'darwin'` で分岐し、macOS専用の「アプリ名メニュー（About, Hide, Quit）」を追加します。
-- **IPC連動**: 「ファイルを開く（Cmd/Ctrl+O）」や「保存（Cmd/Ctrl+S）」等の標準ショートカットは、レンダラープロセスの JupyterLite UI 側へ IPC メッセージを送信して連動させます。
+- **ファイルメニューと役割分担**:
+  - **JupyterLab内**: 通常のノートブック保存（`Ctrl+S`）は JupyterLab UI 内で完結し、IndexedDB に自動永続化されます。
+  - **Electronメニュー**: OS ファイルシステムとのデータ連携を担当（「ノートブックをインポート...」「ノートブックをエクスポート...」「終了 (CmdOrCtrl+Q)」）。
+- **設定・運用メニュー**:
+  - データ保存先変更、エクスプローラー表示、Jupyter設定上書き (`overrides.json`)、ログファイル閲覧 (`app.log`) への直通ショートカットを提供。
 
-### 1.2 右クリックコンテキストメニュー (`setupContextMenu`)
+### 1.2 未保存ガードと終了ライフサイクル (`will-prevent-unload`)
+- JupyterLab は新規ノートブックやセル編集時に `beforeunload` イベントで未保存変更をガードします。
+- Electron はデフォルトでこのプロンプトを表示せずクローズ処理が無反応になる問題があるため、メインプロセス側で `webContents.on('will-prevent-unload')` をリスンし、「保存せずに終了 / キャンセル」のネイティブダイアログを表示して安全にアプリを閉じられるようにしています。
+
+### 1.3 右クリックコンテキストメニュー (`setupContextMenu`)
 - JupyterLab 自体が独自コンテキストメニューを描画しますが、テキスト編集領域や外部フォーム等では `context-menu` イベントをフックし、標準の切り取り/コピー/貼り付けポップアップメニューを `menu.popup({ window })` で表示します。
 
 ---

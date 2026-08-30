@@ -52,3 +52,13 @@ generated:
 * **事象**: 開発モードで DevTools に CSP の警告が表示される。
 * **原因**: レスポンスヘッダーに `Content-Security-Policy` が未指定だったため。
 * **解決策**: ローカル HTTP サーバーのレスポンスヘッダーに `Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*;` を付与して解消。
+
+### ⑦ 新規起動時や未保存ノートブックがある状態でウィンドウの「×」ボタンを押しても終了しない
+* **事象**: ノートブックを編集中のまま、または新規起動直後に Electron ウィンドウの「×」ボタンを押してもウィンドウが閉じない（無反応になる）。
+* **原因**: JupyterLab が未保存の変更（dirty state）を検出してブラウザの `beforeunload` ガードを有効化しているが、Electron ではデフォルトでブラウザの離脱確認プロンプトが表示されず、クローズ要求が内部でキャンセル（ブロック）されるため。
+* **解決策**: メインプロセス側で `mainWindow.webContents.on('will-prevent-unload')` をリスンし、Electron ネイティブの終了確認ダイアログ（「保存せずに終了 / キャンセル」）を表示してアンロード阻止を解除（`event.preventDefault()`）する。
+
+### ⑧ 再起動するたびに保存したノートブックや設定が消えてしまう
+* **事象**: ノートブックを保存してアプリを終了し、再度立ち上げるとファイル一覧が空になり、前回のデータが見当たらない。
+* **原因**: 内部HTTPサーバーが `server.listen(0)` でランダムポートを使用していたため、起動するたびにオリジン（`http://127.0.0.1:<port>`）が変わり、Chromium の同一生成元ポリシー（Same-Origin Policy）により別オリジンの IndexedDB が参照されていたため。
+* **解決策**: `DEFAULT_PORT = 58888` でポートを固定し、`app.requestSingleInstanceLock()` による多重起動防止と組み合わせることで同一オリジンを恒久的に維持する。

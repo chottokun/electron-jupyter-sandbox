@@ -371,6 +371,50 @@ async function changeDataDirectory(parentWin) {
   }
 }
 
+async function handleImportFile(parentWin) {
+  const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
+    title: 'インポートするノートブック / ファイルを選択',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Jupyter Notebook / Python / Data', extensions: ['ipynb', 'py', 'csv', 'json', 'txt'] },
+      { name: 'すべてのファイル', extensions: ['*'] }
+    ]
+  });
+
+  if (canceled || filePaths.length === 0) return;
+
+  try {
+    const filePath = filePaths[0];
+    const fileName = path.basename(filePath);
+    const content = fs.readFileSync(filePath, 'utf-8');
+
+    if (parentWin && !parentWin.isDestroyed()) {
+      parentWin.webContents.send('app:import-file', { fileName, content, path: filePath });
+    }
+    log('MAIN', `File imported: ${filePath}`);
+  } catch (err) {
+    dialog.showErrorBox('インポートエラー', `ファイルの読み込みに失敗しました: ${err.message}`);
+  }
+}
+
+async function handleExportFile(parentWin) {
+  const { canceled, filePath } = await dialog.showSaveDialog(parentWin, {
+    title: 'ノートブックのエクスポート先を選択',
+    defaultPath: 'notebook.ipynb',
+    filters: [
+      { name: 'Jupyter Notebook', extensions: ['ipynb'] },
+      { name: 'Python Script', extensions: ['py'] },
+      { name: 'すべてのファイル', extensions: ['*'] }
+    ]
+  });
+
+  if (canceled || !filePath) return;
+
+  if (parentWin && !parentWin.isDestroyed()) {
+    parentWin.webContents.send('app:request-export-data', { targetPath: filePath });
+  }
+}
+
 let mainWindow = null;
 
 function createWindow(port) {
@@ -397,6 +441,23 @@ function createWindow(port) {
     log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
   });
 
+  // JupyterLab の未保存ガード (beforeunload) によるクローズブロックを適切にハンドリング
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'question',
+      buttons: ['保存せずに終了', 'キャンセル'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '未保存の変更',
+      message: '未保存の変更がある可能性があります。',
+      detail: '保存せずにアプリケーションを終了しますか？'
+    });
+
+    if (choice === 0) {
+      event.preventDefault(); // アンロード阻止を解除して終了を許可
+    }
+  });
+
   // アプリケーションメニューおよび右クリックコンテキストメニューの初期化
   createApplicationMenu(mainWindow, {
     changeDataDirectory,
@@ -404,7 +465,9 @@ function createWindow(port) {
     getOverridesPath,
     getSettingsDir,
     getLogPath,
-    getLogDir
+    getLogDir,
+    handleImportFile,
+    handleExportFile
   });
   setupContextMenu(mainWindow);
 
