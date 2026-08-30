@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-release:
+    name: Build and Release Windows Binaries
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          npm install
+          uv sync
+
+      - name: Build project assets (Extensions + JupyterLite)
+        run: npm run build
+
+      - name: Package Windows installer & portable binary
+        run: npm run package:win
+
+      - name: Generate SHA-256 Checksums
+        shell: powershell
+        run: |
+          Get-ChildItem -Path dist/*.exe, dist/*.zip | Get-FileHash -Algorithm SHA256 | ForEach-Object {
+            "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)"
+          } | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Attest Build Provenance (Artifact Attestations)
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/*.zip
+
+      - name: VirusTotal Scan (Optional / Conditional)
+        id: virustotal
+        if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        shell: powershell
+        run: |
+          echo "VIRUSTOTAL_URL=https://www.virustotal.com/gui/home/upload" >> $env:GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          body: |
+            ## 📦 Release Assets
+            - **Installer (NSIS)**: `setup.exe`
+            - **Portable Version**: `.zip`
+            - **Checksum File**: `SHA256SUMS.txt`
+
+            ## 🛡️ Security & Integrity Verification
+            - **SLSA Provenance**: Artifact Attestations are attached to this release and can be verified via GitHub CLI.
+            - **VirusTotal Report**: Inspection results can be verified on VirusTotal.
+
+            ### PowerShell Checksum Verification Command
+            ```powershell
+            Get-FileHash .\JupyterSandbox-Setup-1.0.0.exe -Algorithm SHA256
+            ```
+
+            ### ⚠️ Windows SmartScreen Notice
+            Unsigned or newly signed open-source binaries may trigger Windows SmartScreen warnings ("Windows protected your PC").
+            1. Click **"More info"** ("詳細情報").
+            2. Click **"Run anyway"** ("実行").

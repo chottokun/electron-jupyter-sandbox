@@ -44,7 +44,8 @@
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "typescript": "^7.0.2"
   },
   "volta": {
     "node": "20.18.0",
