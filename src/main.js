@@ -7,22 +7,57 @@ const http = require('http');
 let server = null;
 let serverPort = 0;
 
-// ロガー設定: ターミナル出力 + app.log への自動保存
-const LOG_FILE = path.join(__dirname, '../app.log');
+let logFilePath = null;
 
-// 起動時にログファイルを初期化
-fs.writeFileSync(LOG_FILE, `=== Application Started at ${new Date().toISOString()} ===\n`, 'utf-8');
+function getLogPath() {
+  if (!logFilePath) {
+    try {
+      const baseDir = app.isPackaged ? app.getPath('userData') : path.join(__dirname, '..');
+      logFilePath = path.join(baseDir, 'app.log');
+    } catch (e) {
+      logFilePath = null;
+    }
+  }
+  return logFilePath;
+}
+
+function initLogger() {
+  const filePath = getLogPath();
+  if (filePath) {
+    try {
+      fs.writeFileSync(filePath, `=== Application Started at ${new Date().toISOString()} ===\n`, 'utf-8');
+    } catch (e) {
+      console.error('Failed to init log file:', e);
+    }
+  }
+}
 
 function log(category, message) {
   const timestamp = new Date().toLocaleTimeString();
   const logLine = `[${timestamp}] [${category}] ${message}`;
   console.log(logLine);
   try {
-    fs.appendFileSync(LOG_FILE, logLine + '\n', 'utf-8');
+    const filePath = getLogPath();
+    if (filePath) {
+      fs.appendFileSync(filePath, logLine + '\n', 'utf-8');
+    }
+  } catch (e) {
+    // ignore logging failures
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  log('FATAL ERROR', `Uncaught Exception: ${err.stack || err}`);
+  try {
+    dialog.showErrorBox('Application Error', `予期せぬエラーが発生しました:\n${err.message}\n\n詳細はログをご確認ください。`);
   } catch (e) {
     // ignore
   }
-}
+});
+
+process.on('unhandledRejection', (reason) => {
+  log('UNHANDLED REJECTION', `Unhandled Rejection: ${reason}`);
+});
 
 // MIMEタイプの定義
 const MIME_TYPES = {
@@ -133,7 +168,13 @@ function createWindow(port) {
 }
 
 app.whenReady().then(async () => {
-  const rootDir = path.resolve(__dirname, '../jupyterlite');
+  initLogger();
+
+  const rootDir = app.isPackaged
+    ? path.join(app.getAppPath(), 'jupyterlite')
+    : path.resolve(__dirname, '../jupyterlite');
+
+  log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir})`);
 
   // 1. ローカル配信HTTPサーバーの起動
   const port = await startLocalServer(rootDir);
