@@ -66,15 +66,21 @@ graph TD
 - メニューバーに「**設定 (Settings)**」メニューを追加：
   - **「データ保存先フォルダを変更...」**: フォルダ選択ダイアログを開き、`config.json` を更新して再起動プロンプトを表示。
   - **「データ保存先フォルダを開く (OSエクスプローラー)」**: 現在の保存先フォルダを直接開く。
+  - **「Jupyter設定ファイルを開く (overrides.json)」**: デフォルトテーマやキーマップなどの設定ファイルを直接編集。
+  - **「Jupyter設定フォルダを開く」**: `dataDir/settings/` をファイルマネージャーで開く。
 - メニューバー「**ヘルプ (Help)**」の強化：
   - **「ログファイルを開く (app.log)」**: `dataDir/logs/app.log` を直接開く。
   - **「ログフォルダを開く」**: `dataDir/logs/` をファイルマネージャーで開く。
   - **「バージョン・環境情報」**: データ保存先およびログ保存先パスを表示。
 
-#### ④ ログファイルの保存先体系
-- ログファイルはデータフォルダ配下の `dataDir/logs/app.log` に自動保存され、データとログを一括で管理・バックアップ可能。
+#### ④ ログファイルおよびJupyter設定の保存先体系
+- **ログファイル**: `dataDir/logs/app.log` に自動保存。
+- **Jupyter 設定 (UI操作)**: JupyterLab の Settings Editor から変更したテーマやフォントサイズは、同一オリジン（`58888`）の IndexedDB / Local Storage に自動永続化。
+- **Jupyter デフォルト上書き設定 (ファイル定義)**: `dataDir/settings/overrides.json` に記述された設定が起動時に `jupyter-lite.json` に動的マージされ、即座に反映。
 
 #### ⑤ BrowserWindow とセッションの設定
+- `DEFAULT_PORT = 58888` による固定ポート化で、同一オリジンを維持（IndexedDB永続化の確実化）。
+- `app.requestSingleInstanceLock()` による二重起動防止。
 - `webPreferences` に `partition: 'persist:jupyter-data'` を設定し、IndexedDB/LocalStorage の永続化を明示。
 - 既存のネットワーク完全隔離フィルター (`session.defaultSession` およびカスタムパーティションセッション) を適用。
 

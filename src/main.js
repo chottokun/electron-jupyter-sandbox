@@ -61,6 +61,50 @@ let serverPort = 0;
 
 let logFilePath = null;
 let logDirPath = null;
+let settingsDirPath = null;
+let overridesFilePath = null;
+
+function getSettingsDir() {
+  if (!settingsDirPath) {
+    settingsDirPath = path.join(currentDataDir, 'settings');
+    try {
+      if (!fs.existsSync(settingsDirPath)) {
+        fs.mkdirSync(settingsDirPath, { recursive: true });
+      }
+    } catch (e) {
+      console.error('Failed to create settings directory:', e);
+    }
+  }
+  return settingsDirPath;
+}
+
+function getOverridesPath() {
+  if (!overridesFilePath) {
+    const dir = getSettingsDir();
+    overridesFilePath = path.join(dir, 'overrides.json');
+    try {
+      if (!fs.existsSync(overridesFilePath)) {
+        fs.writeFileSync(overridesFilePath, '{\n  "@jupyterlab/apputils-extension:themes": {\n    "theme": "JupyterLab Dark"\n  }\n}\n', 'utf-8');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return overridesFilePath;
+}
+
+function loadOverrides() {
+  try {
+    const filePath = getOverridesPath();
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    log('SERVER ERROR', `Failed to parse overrides.json: ${e.message}`);
+  }
+  return null;
+}
 
 function getLogDir() {
   if (!logDirPath) {
@@ -223,6 +267,24 @@ function startLocalServer(rootDir, preferredPort = DEFAULT_PORT) {
           'Cache-Control': 'no-cache'
         });
 
+        // jupyter-lite.json の場合、dataDir/settings/overrides.json の設定を動的にマージして配信
+        if (path.basename(filePath) === 'jupyter-lite.json') {
+          try {
+            const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            const userOverrides = loadOverrides();
+            if (userOverrides) {
+              baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
+              baseContent['jupyter-config-data']['settingsOverrides'] = {
+                ...(baseContent['jupyter-config-data']['settingsOverrides'] || {}),
+                ...userOverrides
+              };
+            }
+            return res.end(JSON.stringify(baseContent, null, 2));
+          } catch (err) {
+            log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);
+          }
+        }
+
         const stream = fs.createReadStream(filePath);
         stream.pipe(res);
       } catch (err) {
@@ -375,6 +437,29 @@ function setupApplicationMenu(mainWindow) {
               await shell.openPath(dataDir);
             } else {
               dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${dataDir}`);
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Jupyter設定ファイルを開く (overrides.json)',
+          click: async () => {
+            const overridesPath = getOverridesPath();
+            if (overridesPath && fs.existsSync(overridesPath)) {
+              await shell.openPath(overridesPath);
+            } else {
+              dialog.showErrorBox('エラー', '設定ファイルが見つかりません。');
+            }
+          }
+        },
+        {
+          label: 'Jupyter設定フォルダを開く',
+          click: async () => {
+            const settingsDir = getSettingsDir();
+            if (fs.existsSync(settingsDir)) {
+              await shell.openPath(settingsDir);
+            } else {
+              dialog.showErrorBox('エラー', `設定フォルダが存在しません: ${settingsDir}`);
             }
           }
         }
