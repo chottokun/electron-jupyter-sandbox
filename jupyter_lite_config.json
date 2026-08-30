@@ -3,7 +3,7 @@
     "output_dir": "jupyterlite",
     "apps": ["lab"],
     "federated_extensions": [
-      "packages/ai-copy-extension"
+      "packages/ai-copy-extension/labextension"
     ]
   },
   "PyodideAddon": {

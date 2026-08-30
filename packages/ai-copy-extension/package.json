@@ -9,9 +9,8 @@
     "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}"
   ],
   "scripts": {
-    "build": "tsc",
-    "build:labextension": "jupyter labextension build .",
-    "clean": "rimraf lib tsconfig.tsbuildinfo"
+    "build": "tsc && uv run jupyter labextension build .",
+    "clean": "rimraf lib labextension tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@jupyterlab/application": "^4.0.0",
@@ -26,6 +25,6 @@
   },
   "jupyterlab": {
     "extension": true,
-    "outputDir": "../../jupyterlite/extensions/@electron-jupyter-sandbox/ai-copy-extension"
+    "outputDir": "labextension"
   }
 }
