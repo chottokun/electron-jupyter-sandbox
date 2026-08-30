@@ -16,6 +16,8 @@ jobs:
     name: Build and Release Windows Binaries
     runs-on: windows-latest
     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
 
     steps:
