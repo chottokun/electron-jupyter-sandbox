@@ -1,0 +1,53 @@
+{
+  "name": "electron-jupyter-sandbox",
+  "version": "1.0.0",
+  "description": "完全隔離型・AI連携デスクトップJupyter環境",
+  "license": "MIT",
+  "main": "src/main.js",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build:ext": "npm run --workspace=@electron-jupyter-sandbox/ai-copy-extension build",
+    "build:jupyter": "uv run jupyter lite build --config jupyter_lite_config.json",
+    "build": "npm run build:ext && npm run build:jupyter",
+    "start": "electron . --no-sandbox",
+    "package:win": "electron-builder --win --x64",
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "com.example.electron-jupyter-sandbox",
+    "productName": "JupyterSandbox",
+    "files": [
+      "src/**/*",
+      "jupyterlite/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "volta": {
+    "node": "20.18.0",
+    "npm": "10.8.2"
+  }
+}

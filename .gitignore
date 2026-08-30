@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Build Outputs & Generated Assets
+dist/
+jupyterlite/
+.jupyterlite.doit.db
+packages/*/lib/
+packages/*/tsconfig.tsbuildinfo
+
+# Logs & Cache
+*.log
+app.log
+.cache/
+.pytest_cache/
+__pycache__/
+
+# Agent configurations
+.agents/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
