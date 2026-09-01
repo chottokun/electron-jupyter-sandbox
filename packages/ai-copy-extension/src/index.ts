@@ -2,6 +2,7 @@ import { JupyterFrontEnd, JupyterFrontEndPlugin } from '@jupyterlab/application'
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { CodeCell, ICodeCellModel } from '@jupyterlab/cells';
 import { IOutputModel } from '@jupyterlab/rendermime';
+import { formatAIPrompt, ErrorJson } from './prompt';
 
 const aiCopyPlugin: JupyterFrontEndPlugin<void> = {
   id: 'electron-jupyter-ai-copy:plugin',
@@ -70,27 +71,9 @@ function attachAICopyButton(cellWidget: CodeCell, errorOutput: IOutputModel) {
     try {
       // ボタンクリック時点で最新のコードを取得
       const sourceCode = cellWidget.model.sharedModel.getSource();
+      const errorJson = errorOutput.toJSON() as ErrorJson;
 
-      const errorJson = errorOutput.toJSON() as { traceback?: string[]; ename?: string; evalue?: string };
-      // トレースバックの整形（ANSIカラーコードを除去）
-      const traceback = Array.isArray(errorJson?.traceback)
-        ? errorJson.traceback.join('\n').replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
-        : `${errorJson?.ename || 'Error'}: ${errorJson?.evalue || ''}`;
-
-      const prompt = [
-        '以下のJupyter (Python/Pyodide WASM) 環境でコード実行時にエラーが発生しました。',
-        '原因の解説と、修正したコードを提示してください。',
-        '',
-        '【実行コード】',
-        '```python',
-        sourceCode,
-        '```',
-        '',
-        '【エラー内容 / トレースバック】',
-        '```text',
-        traceback,
-        '```'
-      ].join('\n');
+      const prompt = formatAIPrompt(sourceCode, errorJson);
 
       await navigator.clipboard.writeText(prompt);
       btn.innerText = '✅ コピー完了！';
