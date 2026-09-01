@@ -1,8 +1,12 @@
-const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const url = require('url');
-const http = require('http');
+
+const { saveConfig, getResolvedDataDir } = require('./config');
+const { logger } = require('./logger');
+const { getSettingsDir, getOverridesPath } = require('./settings');
+const { startLocalServer } = require('./server');
+const { applyNetworkFilter } = require('./security');
 const { createApplicationMenu, setupContextMenu } = require('./menu');
 
 // アプリケーションのベースディレクトリ解決
@@ -12,42 +16,7 @@ const appRootDir = app.isPackaged
 
 const configFilePath = path.join(appRootDir, 'config.json');
 
-function loadConfig() {
-  try {
-    if (fs.existsSync(configFilePath)) {
-      const raw = fs.readFileSync(configFilePath, 'utf-8');
-      return JSON.parse(raw);
-    }
-  } catch (err) {
-    console.error('Failed to read config.json:', err);
-  }
-  return {};
-}
-
-function saveConfig(updates) {
-  try {
-    const current = loadConfig();
-    const merged = { ...current, ...updates };
-    fs.writeFileSync(configFilePath, JSON.stringify(merged, null, 2), 'utf-8');
-    return true;
-  } catch (err) {
-    console.error('Failed to write config.json:', err);
-    return false;
-  }
-}
-
-function getResolvedDataDir() {
-  const config = loadConfig();
-  if (config.dataDir) {
-    return path.isAbsolute(config.dataDir)
-      ? config.dataDir
-      : path.resolve(appRootDir, config.dataDir);
-  }
-  return path.join(appRootDir, 'data');
-}
-
-// 起動初期（app.whenReady前）に userData を設定して永続化ディレクトリを決定
-const currentDataDir = getResolvedDataDir();
+const currentDataDir = getResolvedDataDir(appRootDir, configFilePath);
 try {
   if (!fs.existsSync(currentDataDir)) {
     fs.mkdirSync(currentDataDir, { recursive: true });
@@ -57,143 +26,10 @@ try {
   console.error('Failed to initialize data directory:', e);
 }
 
-let server = null;
-let serverPort = 0;
-
-let logFilePath = null;
-let logDirPath = null;
-let settingsDirPath = null;
-let overridesFilePath = null;
-
-function getSettingsDir() {
-  if (!settingsDirPath) {
-    settingsDirPath = path.join(currentDataDir, 'settings');
-    try {
-      if (!fs.existsSync(settingsDirPath)) {
-        fs.mkdirSync(settingsDirPath, { recursive: true });
-      }
-    } catch (e) {
-      console.error('Failed to create settings directory:', e);
-    }
-  }
-  return settingsDirPath;
-}
-
-function getOverridesPath() {
-  if (!overridesFilePath) {
-    const dir = getSettingsDir();
-    overridesFilePath = path.join(dir, 'overrides.json');
-    try {
-      if (!fs.existsSync(overridesFilePath)) {
-        fs.writeFileSync(overridesFilePath, '{\n  "@jupyterlab/apputils-extension:themes": {\n    "theme": "JupyterLab Dark"\n  }\n}\n', 'utf-8');
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-  return overridesFilePath;
-}
-
-function loadOverrides() {
-  try {
-    const filePath = getOverridesPath();
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(content);
-    }
-  } catch (e) {
-    log('SERVER ERROR', `Failed to parse overrides.json: ${e.message}`);
-  }
-  return null;
-}
-
-function getLogDir() {
-  if (!logDirPath) {
-    logDirPath = path.join(currentDataDir, 'logs');
-    try {
-      if (!fs.existsSync(logDirPath)) {
-        fs.mkdirSync(logDirPath, { recursive: true });
-      }
-    } catch (e) {
-      console.error('Failed to create logs directory:', e);
-    }
-  }
-  return logDirPath;
-}
-
-function getLogPath() {
-  if (!logFilePath) {
-    try {
-      const dir = getLogDir();
-      logFilePath = path.join(dir, 'app.log');
-    } catch (e) {
-      logFilePath = null;
-    }
-  }
-  return logFilePath;
-}
-
-function initLogger() {
-  const filePath = getLogPath();
-  if (filePath) {
-    try {
-      fs.writeFileSync(filePath, `=== Application Started at ${new Date().toISOString()} ===\n`, 'utf-8');
-    } catch (e) {
-      console.error('Failed to init log file:', e);
-    }
-  }
-}
-
-const LOG_MAX_SIZE = 2 * 1024 * 1024; // 2MB
-
-// パッケージ版でファイル記録する重要カテゴリ
-const CRITICAL_CATEGORIES = new Set([
-  'MAIN',
-  'FATAL ERROR',
-  'UNHANDLED REJECTION',
-  'SERVER ERROR',
-  'RENDERER ERROR',
-  'RENDERER WARN',
-  'SECURITY BLOCKED',
-  'STARTUP ERROR'
-]);
-
-function log(category, message) {
-  const timestamp = new Date().toLocaleTimeString();
-  const logLine = `[${timestamp}] [${category}] ${message}`;
-  console.log(logLine);
-
-  // パッケージ版の場合は、重要イベント（起動情報・エラー・警告・セキュリティブロック）のみ保存
-  if (app.isPackaged) {
-    const isCritical = CRITICAL_CATEGORIES.has(category) || category.includes('ERROR') || category.includes('WARN');
-    if (!isCritical) {
-      return;
-    }
-  }
-
-  try {
-    const filePath = getLogPath();
-    if (filePath) {
-      // ログローテーション（2MB超過時にバックアップして初期化）
-      if (fs.existsSync(filePath)) {
-        const stats = fs.statSync(filePath);
-        if (stats.size > LOG_MAX_SIZE) {
-          try {
-            fs.renameSync(filePath, `${filePath}.old`);
-          } catch (e) {
-            // ignore
-          }
-        }
-      }
-      fs.appendFileSync(filePath, logLine + '\n', 'utf-8');
-    }
-  } catch (e) {
-    // ignore logging failures
-  }
-}
+let serverInstance = null;
 
 process.on('uncaughtException', (err) => {
-  log('FATAL ERROR', `Uncaught Exception: ${err.stack || err}`);
+  logger.log('FATAL ERROR', `Uncaught Exception: ${err.stack || err}`, app.isPackaged, currentDataDir);
   try {
     dialog.showErrorBox('Application Error', `予期せぬエラーが発生しました:\n${err.message}\n\n詳細はログをご確認ください。`);
   } catch (e) {
@@ -202,145 +38,11 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  log('UNHANDLED REJECTION', `Unhandled Rejection: ${reason}`);
+  logger.log('UNHANDLED REJECTION', `Unhandled Rejection: ${reason}`, app.isPackaged, currentDataDir);
 });
 
-// MIMEタイプの定義
-const MIME_TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.ipynb': 'application/json; charset=utf-8',
-  '.wasm': 'application/wasm',
-  '.whl': 'application/x-wheel+zip',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.map': 'application/json',
-  '.txt': 'text/plain; charset=utf-8',
-  '.zip': 'application/zip',
-  '.tar': 'application/x-tar',
-  '.webmanifest': 'application/manifest+json'
-};
-
-const DEFAULT_PORT = 58888;
-
-function startLocalServer(rootDir, preferredPort = DEFAULT_PORT) {
-  return new Promise((resolve, reject) => {
-    server = http.createServer((req, res) => {
-      try {
-        const parsedUrl = new url.URL(req.url, `http://127.0.0.1:${serverPort}`);
-        let relativePath = decodeURIComponent(parsedUrl.pathname);
-
-        if (relativePath === '/' || relativePath === '') {
-          relativePath = '/lab/index.html';
-        }
-
-        // パストラバーサル対策（`path.relative` による厳格なルート配下検証）
-        const normalizedRel = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
-        const filePath = path.resolve(rootDir, '.' + (normalizedRel.startsWith('/') ? normalizedRel : '/' + normalizedRel));
-        const relFromRoot = path.relative(rootDir, filePath);
-
-        if (relFromRoot.startsWith('..') || path.isAbsolute(relFromRoot)) {
-          log('HTTP 403', `Access Denied: ${relativePath}`);
-          res.writeHead(403);
-          return res.end('Access Denied');
-        }
-
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-          log('HTTP 404', `Not Found: ${relativePath}`);
-          res.writeHead(404);
-          return res.end(`Not Found: ${relativePath}`);
-        }
-
-        const ext = path.extname(filePath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-        // Wasm / ServiceWorker 実行に必要なセキュリティヘッダーを付与
-        res.writeHead(200, {
-          'Content-Type': contentType,
-          'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob:;",
-          'Cross-Origin-Opener-Policy': 'same-origin',
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Resource-Policy': 'same-origin',
-          'Cache-Control': 'no-cache'
-        });
-
-        // jupyter-lite.json の場合、dataDir/settings/overrides.json の設定を動的にマージして配信
-        if (path.basename(filePath) === 'jupyter-lite.json') {
-          try {
-            const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const userOverrides = loadOverrides();
-            if (userOverrides) {
-              baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
-              baseContent['jupyter-config-data']['settingsOverrides'] = {
-                ...(baseContent['jupyter-config-data']['settingsOverrides'] || {}),
-                ...userOverrides
-              };
-            }
-            return res.end(JSON.stringify(baseContent, null, 2));
-          } catch (err) {
-            log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);
-          }
-        }
-
-        const stream = fs.createReadStream(filePath);
-        stream.pipe(res);
-      } catch (err) {
-        log('SERVER ERROR', `${err.message}`);
-        res.writeHead(500);
-        res.end(err.message);
-      }
-    });
-
-    // IndexedDBの同一オリジン(Same-Origin)維持のため、固定ポートを優先バインド
-    const tryListen = (portToTry) => {
-      server.listen(portToTry, '127.0.0.1', () => {
-        serverPort = server.address().port;
-        log('MAIN', `Local Server started on http://127.0.0.1:${serverPort}`);
-        resolve(serverPort);
-      });
-    };
-
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        log('MAIN', `Port ${preferredPort} is in use, trying next port...`);
-        preferredPort++;
-        tryListen(preferredPort);
-      } else {
-        reject(err);
-      }
-    });
-
-    tryListen(preferredPort);
-  });
-}
-
-function applyNetworkFilter(targetSession) {
-  targetSession.webRequest.onBeforeRequest((details, callback) => {
-    try {
-      const parsed = new URL(details.url);
-      const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
-      const isInternal = parsed.protocol === 'devtools:' || parsed.protocol === 'blob:' || parsed.protocol === 'data:';
-
-      if (isInternal || isLocal) {
-        callback({ cancel: false });
-      } else {
-        log('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
-        callback({ cancel: true });
-      }
-    } catch (e) {
-      log('SECURITY BLOCKED', `無効なURL要求を遮断しました: ${details.url}`);
-      callback({ cancel: true });
-    }
-  });
-}
-
 async function changeDataDirectory(parentWin) {
-  const current = getResolvedDataDir();
+  const current = getResolvedDataDir(appRootDir, configFilePath);
   const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
     title: 'データ保存先ディレクトリを選択',
     defaultPath: current,
@@ -350,7 +52,7 @@ async function changeDataDirectory(parentWin) {
   if (canceled || filePaths.length === 0) return;
 
   const selectedPath = filePaths[0];
-  const success = saveConfig({ dataDir: selectedPath });
+  const success = saveConfig(configFilePath, { dataDir: selectedPath });
 
   if (success) {
     const response = await dialog.showMessageBox(parentWin, {
@@ -392,7 +94,7 @@ async function handleImportFile(parentWin) {
     if (parentWin && !parentWin.isDestroyed()) {
       parentWin.webContents.send('app:import-file', { fileName, content, path: filePath });
     }
-    log('MAIN', `File imported: ${filePath}`);
+    logger.log('MAIN', `File imported: ${filePath}`, app.isPackaged, currentDataDir);
   } catch (err) {
     dialog.showErrorBox('インポートエラー', `ファイルの読み込みに失敗しました: ${err.message}`);
   }
@@ -436,13 +138,11 @@ function createWindow(port) {
     }
   });
 
-  // レンダラープロセスのコンソールログをターミナルおよびapp.logに出力
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
-    log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`);
+    logger.log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`, app.isPackaged, currentDataDir);
   });
 
-  // JupyterLab の未保存ガード (beforeunload) によるクローズブロックを適切にハンドリング
   mainWindow.webContents.on('will-prevent-unload', (event) => {
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: 'question',
@@ -455,24 +155,22 @@ function createWindow(port) {
     });
 
     if (choice === 0) {
-      event.preventDefault(); // アンロード阻止を解除して終了を許可
+      event.preventDefault();
     }
   });
 
-  // アプリケーションメニューおよび右クリックコンテキストメニューの初期化
   createApplicationMenu(mainWindow, {
     changeDataDirectory,
-    getResolvedDataDir,
-    getOverridesPath,
-    getSettingsDir,
-    getLogPath,
-    getLogDir,
+    getResolvedDataDir: () => getResolvedDataDir(appRootDir, configFilePath),
+    getOverridesPath: () => getOverridesPath(currentDataDir),
+    getSettingsDir: () => getSettingsDir(currentDataDir),
+    getLogPath: () => logger.getLogPath(currentDataDir),
+    getLogDir: () => logger.getLogDir(currentDataDir),
     handleImportFile,
     handleExportFile
   });
   setupContextMenu(mainWindow);
 
-  // ローカルHTTPサーバー経由でJupyterLabをロード
   mainWindow.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
 
   mainWindow.on('closed', () => {
@@ -480,7 +178,6 @@ function createWindow(port) {
   });
 }
 
-// 二重起動防止（ポート競合・オリジン分散を防止）
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -493,26 +190,25 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
-    initLogger();
+    logger.initLogger(currentDataDir);
 
     const rootDir = app.isPackaged
       ? path.join(app.getAppPath(), 'jupyterlite')
       : path.resolve(__dirname, '../jupyterlite');
 
-    log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`);
+    logger.log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`, app.isPackaged, currentDataDir);
 
-    // 1. ローカル配信HTTPサーバーの起動
-    const port = await startLocalServer(rootDir);
+    const { server, port } = await startLocalServer(rootDir, currentDataDir);
+    serverInstance = server;
 
-    // 2. ネットワーク完全隔離 (デフォルトセッションおよび永続セッション両方で外部通信を遮断)
-    applyNetworkFilter(session.defaultSession);
-    applyNetworkFilter(session.fromPartition('persist:jupyter-data'));
+    const logHandler = (cat, msg) => logger.log(cat, msg, app.isPackaged, currentDataDir);
+    applyNetworkFilter(session.defaultSession, logHandler);
+    applyNetworkFilter(session.fromPartition('persist:jupyter-data'), logHandler);
 
     createWindow(port);
   });
 }
 
-// 4. ファイル I/O 用の IPC ハンドラー
 ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
@@ -549,20 +245,19 @@ ipcMain.handle('dialog:saveFile', async (event, { defaultName, data }) => {
   return { success: false };
 });
 
-// 5. アプリケーション終了処理 (ウィンドウを閉じたら完全停止)
 app.on('window-all-closed', () => {
-  log('MAIN', 'すべてのウィンドウが閉じられました。アプリケーションを完全終了します。');
+  logger.log('MAIN', 'すべてのウィンドウが閉じられました。アプリケーションを完全終了します。', app.isPackaged, currentDataDir);
   app.quit();
 });
 
 app.on('will-quit', () => {
-  if (server) {
+  if (serverInstance) {
     try {
-      server.close();
-      log('MAIN', 'ローカルHTTPサーバーを安全に停止しました。');
+      serverInstance.close();
+      logger.log('MAIN', 'ローカルHTTPサーバーを安全に停止しました。', app.isPackaged, currentDataDir);
     } catch (e) {
       // ignore
     }
   }
-  log('MAIN', `=== Application Terminated at ${new Date().toISOString()} ===`);
+  logger.log('MAIN', `=== Application Terminated at ${new Date().toISOString()} ===`, app.isPackaged, currentDataDir);
 });

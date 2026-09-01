@@ -2,6 +2,7 @@ import { JupyterFrontEnd, JupyterFrontEndPlugin } from '@jupyterlab/application'
 import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { CodeCell, ICodeCellModel } from '@jupyterlab/cells';
 import { IOutputModel } from '@jupyterlab/rendermime';
+import { buildAIPrompt, ErrorOutputJson } from './prompt';
 
 const aiCopyPlugin: JupyterFrontEndPlugin<void> = {
   id: 'electron-jupyter-ai-copy:plugin',
@@ -35,11 +36,9 @@ const aiCopyPlugin: JupyterFrontEndPlugin<void> = {
       nbPanel.revealed.then(() => {
         const cells = nbPanel.content.model?.cells;
         if (cells) {
-          // 既存セルの登録
           for (let i = 0; i < cells.length; i++) {
             setupCellObserver(cells.get(i), nbPanel);
           }
-          // 追加セルの登録
           cells.changed.connect((_, change) => {
             if (change.type === 'add') {
               change.newValues.forEach(cellModel => {
@@ -68,29 +67,9 @@ function attachAICopyButton(cellWidget: CodeCell, errorOutput: IOutputModel) {
 
   btn.onclick = async () => {
     try {
-      // ボタンクリック時点で最新のコードを取得
       const sourceCode = cellWidget.model.sharedModel.getSource();
-
-      const errorJson = errorOutput.toJSON() as { traceback?: string[]; ename?: string; evalue?: string };
-      // トレースバックの整形（ANSIカラーコードを除去）
-      const traceback = Array.isArray(errorJson?.traceback)
-        ? errorJson.traceback.join('\n').replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
-        : `${errorJson?.ename || 'Error'}: ${errorJson?.evalue || ''}`;
-
-      const prompt = [
-        '以下のJupyter (Python/Pyodide WASM) 環境でコード実行時にエラーが発生しました。',
-        '原因の解説と、修正したコードを提示してください。',
-        '',
-        '【実行コード】',
-        '```python',
-        sourceCode,
-        '```',
-        '',
-        '【エラー内容 / トレースバック】',
-        '```text',
-        traceback,
-        '```'
-      ].join('\n');
+      const errorJson = errorOutput.toJSON() as ErrorOutputJson;
+      const prompt = buildAIPrompt(sourceCode, errorJson);
 
       await navigator.clipboard.writeText(prompt);
       btn.innerText = '✅ コピー完了！';
