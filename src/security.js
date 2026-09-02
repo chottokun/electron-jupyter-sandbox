@@ -61,26 +61,34 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
     }
   });
 
-  // レスポンスヘッダー調整（CORS 緩和および CSP 動的適用）
+  // レスポンスヘッダー調整（CORS 緩和、CORP 付与、CSP 動的適用）
   if (targetSession.webRequest.onHeadersReceived) {
     targetSession.webRequest.onHeadersReceived((details, callback) => {
       const responseHeaders = { ...(details.responseHeaders || {}) };
 
       if (isNetworkAllowed()) {
-        // 外部通信許可時: レンダラーおよび Pyodide からの fetch を通すため CORS を許可
+        // 外部通信許可時: COEP環境下での外部リクエスト破棄を防ぐため CORP と CORS を付与
         responseHeaders['Access-Control-Allow-Origin'] = ['*'];
         responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS, HEAD'];
         responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+        responseHeaders['Cross-Origin-Resource-Policy'] = ['cross-origin'];
 
-        // CSP が存在する場合、connect-src に * を追加して fetch 遮断を解除
-        const cspKey = Object.keys(responseHeaders).find(k => k.toLowerCase() === 'content-security-policy');
-        if (cspKey && responseHeaders[cspKey]) {
-          responseHeaders[cspKey] = responseHeaders[cspKey].map(val => {
-            if (val.includes('connect-src')) {
-              return val.replace(/connect-src [^;]+/, "connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
-            }
-            return val;
-          });
+        // CSP が存在する場合、connect-src / img-src に * を追加して fetch 遮断を解除
+        for (const key of Object.keys(responseHeaders)) {
+          if (key.toLowerCase() === 'content-security-policy') {
+            responseHeaders[key] = responseHeaders[key].map(val => {
+              let updated = val;
+              if (updated.includes('connect-src')) {
+                updated = updated.replace(/connect-src [^;]+/, "connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
+              if (updated.includes('img-src')) {
+                updated = updated.replace(/img-src [^;]+/, "img-src * 'self' data: blob:");
+              }
+              return updated;
+            });
+          }
         }
       }
 
@@ -88,6 +96,7 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
     });
   }
 }
+
 
 
 module.exports = {

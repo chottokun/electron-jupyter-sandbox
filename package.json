@@ -9,7 +9,8 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node --test tests/**/*.test.js",
+    "test": "npm run set-policy:strict && node --test tests/**/*.test.js",
+
     "build:ext": "npm run --workspace=@electron-jupyter-sandbox/ai-copy-extension build",
     "build:jupyter": "uv run jupyter lite build --config jupyter_lite_config.json",
     "build": "npm run build:ext && npm run build:jupyter",

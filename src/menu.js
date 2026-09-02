@@ -184,15 +184,40 @@ function createApplicationMenu(mainWindow, handlers = {}) {
 
                     if (result.response === 0) {
                       await toggleExternalNetwork(true);
+                      const reloadChoice = await dialog.showMessageBox(mainWindow, {
+                        type: 'question',
+                        buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+                        defaultId: 0,
+                        cancelId: 1,
+                        title: '設定反映',
+                        message: '外部ネットワーク接続を許可しました。',
+                        detail: '新しいセキュリティ設定（CSPおよび通信許可）を完全に適用するため、ページを再読み込みすることを推奨します。今すぐ再読み込みしますか？'
+                      });
+                      if (reloadChoice.response === 0) {
+                        mainWindow.reload();
+                      }
                     } else {
                       menuItem.checked = false;
                     }
                   } else {
                     await toggleExternalNetwork(false);
+                    const reloadChoice = await dialog.showMessageBox(mainWindow, {
+                      type: 'info',
+                      buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+                      defaultId: 0,
+                      cancelId: 1,
+                      title: '設定反映',
+                      message: '外部ネットワーク接続を遮断しました。',
+                      detail: '完全隔離状態へ戻すため、ページを再読み込みすることを推奨します。今すぐ再読み込みしますか？'
+                    });
+                    if (reloadChoice.response === 0) {
+                      mainWindow.reload();
+                    }
                   }
                 }
               }
             ]
+
           : [
               {
                 label: '外部ネットワーク接続: 完全隔離 (変更不可)',
