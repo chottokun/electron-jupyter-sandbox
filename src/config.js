@@ -3,9 +3,11 @@ const fs = require('fs');
 
 const { isNetworkConfigurable } = require('./policy');
 
+let runtimeNetworkAllowed = null;
+
 function loadConfig(configFilePath) {
   try {
-    if (fs.existsSync(configFilePath)) {
+    if (configFilePath && fs.existsSync(configFilePath)) {
       const raw = fs.readFileSync(configFilePath, 'utf-8');
       return JSON.parse(raw);
     }
@@ -19,7 +21,13 @@ function saveConfig(configFilePath, updates) {
   try {
     const current = loadConfig(configFilePath);
     const merged = { ...current, ...updates };
-    fs.writeFileSync(configFilePath, JSON.stringify(merged, null, 2), 'utf-8');
+    if (configFilePath) {
+      const dir = path.dirname(configFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(configFilePath, JSON.stringify(merged, null, 2), 'utf-8');
+    }
     return true;
   } catch (err) {
     console.error('Failed to write config.json:', err);
@@ -39,28 +47,44 @@ function getResolvedDataDir(appRootDir, configFilePath) {
 
 /**
  * 外部ネットワーク通信が許可されているか判定
- * ※ 完全隔離モード（isNetworkConfigurable === false）の場合は config.json の値に関わらず常に false
+ * ※ 完全隔離モード（isNetworkConfigurable === false）の場合は常に false
  * 
- * @param {string} configFilePath 
+ * @param {string} [configFilePath] 
  * @returns {boolean}
  */
-function isExternalNetworkAllowed(configFilePath) {
+function isExternalNetworkAllowed(configFilePath = null) {
   if (!isNetworkConfigurable()) {
     return false;
   }
-  const config = loadConfig(configFilePath);
-  return config.allowExternalNetwork === true;
+  if (runtimeNetworkAllowed !== null) {
+    return runtimeNetworkAllowed;
+  }
+  if (configFilePath) {
+    const config = loadConfig(configFilePath);
+    runtimeNetworkAllowed = config.allowExternalNetwork === true;
+    return runtimeNetworkAllowed;
+  }
+  return false;
 }
 
 /**
- * 外部ネットワーク通信設定を更新
+ * 外部ネットワーク通信設定を更新（メモリ状態および設定ファイルを更新）
  * 
  * @param {string} configFilePath 
  * @param {boolean} allowed 
  * @returns {boolean}
  */
 function setExternalNetworkAllowed(configFilePath, allowed) {
-  return saveConfig(configFilePath, { allowExternalNetwork: Boolean(allowed) });
+  const boolVal = Boolean(allowed);
+  runtimeNetworkAllowed = boolVal;
+  return saveConfig(configFilePath, { allowExternalNetwork: boolVal });
+}
+
+/**
+ * テスト用: メモリ上のランタイム状態をリセット
+ */
+function resetRuntimeNetworkAllowed() {
+  runtimeNetworkAllowed = null;
 }
 
 module.exports = {
@@ -68,6 +92,8 @@ module.exports = {
   saveConfig,
   getResolvedDataDir,
   isExternalNetworkAllowed,
-  setExternalNetworkAllowed
+  setExternalNetworkAllowed,
+  resetRuntimeNetworkAllowed
 };
+
 

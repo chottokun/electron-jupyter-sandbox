@@ -16,7 +16,15 @@ const appRootDir = app.isPackaged
   ? path.dirname(app.getPath('exe'))
   : path.resolve(__dirname, '..');
 
-const configFilePath = path.join(appRootDir, 'config.json');
+let defaultUserDataDir = path.join(app.getPath('userData'), 'data');
+let configFilePath = path.join(appRootDir, 'config.json');
+
+// appRootDir が書き込み不可（Program Files 等）の場合は userData 配下に config.json を配置
+try {
+  fs.accessSync(appRootDir, fs.constants.W_OK);
+} catch (e) {
+  configFilePath = path.join(app.getPath('userData'), 'config.json');
+}
 
 const currentDataDir = getResolvedDataDir(appRootDir, configFilePath);
 try {
@@ -27,6 +35,7 @@ try {
 } catch (e) {
   console.error('Failed to initialize data directory:', e);
 }
+
 
 let serverInstance = null;
 
