@@ -5,14 +5,17 @@ const LOG_MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
 const CRITICAL_CATEGORIES = new Set([
   'MAIN',
+  'SECURITY',
+  'SECURITY ALLOWED',
+  'SECURITY BLOCKED',
   'FATAL ERROR',
   'UNHANDLED REJECTION',
   'SERVER ERROR',
   'RENDERER ERROR',
   'RENDERER WARN',
-  'SECURITY BLOCKED',
   'STARTUP ERROR'
 ]);
+
 
 class Logger {
   constructor() {
