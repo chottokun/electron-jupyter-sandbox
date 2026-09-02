@@ -18,7 +18,6 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -47,13 +46,41 @@ jobs:
       - name: Package Windows installer & portable binary
         run: npm run package:win
 
-      - name: Generate SHA-256 Checksums
-        shell: powershell
+      - name: Scan build artifacts with Microsoft Defender
+        shell: pwsh
         run: |
-          Get-ChildItem -Path dist/*.exe, dist/*.zip | Get-FileHash -Algorithm SHA256 | ForEach-Object {
-            "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)"
-          } | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
+          $scanPath = (Resolve-Path "dist").Path
+          Write-Host "Scanning $scanPath with Microsoft Defender..."
+          & "C:\Program Files\Windows Defender\MpCmdRun.exe" -Scan -ScanType 3 -File "$scanPath"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Malware or threat detected by Microsoft Defender! Exit code: $LASTEXITCODE"
+            exit 1
+          }
+          Write-Host "Microsoft Defender scan passed successfully."
+
+      - name: Generate Checksums & VirusTotal Links
+        id: vt_links
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path dist/*.exe, dist/*.zip
+          $hashLines = @()
+          $vtMarkdown = @()
+
+          foreach ($file in $files) {
+            $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
+            $hashLines += "$hash  $($file.Name)"
+            $vtMarkdown += "- **$($file.Name)**: [View VirusTotal Report](https://www.virustotal.com/gui/file/$hash) (`$hash`)"
+          }
+
+          # SHA256SUMS.txt を出力
+          $hashLines | Out-File -FilePath dist/SHA256SUMS.txt -Encoding ascii
           Get-Content dist/SHA256SUMS.txt
+
+          # リリースノート埋め込み用のMarkdownを変数に保存
+          $vtReportBody = $vtMarkdown -join "`n"
+          "VT_REPORTS<<EOF" >> $env:GITHUB_ENV
+          "$vtReportBody" >> $env:GITHUB_ENV
+          "EOF" >> $env:GITHUB_ENV
 
       - name: Attest Build Provenance (Artifact Attestations)
         uses: actions/attest-build-provenance@v1
@@ -61,13 +88,6 @@ jobs:
           subject-path: |
             dist/*.exe
             dist/*.zip
-
-      - name: VirusTotal Scan (Optional / Conditional)
-        id: virustotal
-        if: env.VIRUSTOTAL_API_KEY != ''
-        shell: powershell
-        run: |
-          echo "VIRUSTOTAL_URL=https://www.virustotal.com/gui/home/upload" >> $env:GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -84,15 +104,18 @@ jobs:
             - **Checksum File**: `SHA256SUMS.txt`
 
             ## 🛡️ Security & Integrity Verification
-            - **SLSA Provenance**: Artifact Attestations are attached to this release and can be verified via GitHub CLI.
-            - **VirusTotal Report**: Inspection results can be verified on VirusTotal.
+            - **SLSA Provenance**: Artifact Attestations are attached to this release and can be verified via GitHub CLI (`gh attestation verify`).
+            - **VirusTotal Reports**:
+            ${{ env.VT_REPORTS }}
 
-            ### PowerShell Checksum Verification Command
+            ### PowerShell Checksum Verification
             ```powershell
-            Get-FileHash .\JupyterSandbox-Setup-1.0.0.exe -Algorithm SHA256
+            # Verify SHA-256 hash of downloaded file
+            Get-FileHash .\<Downloaded-Package-Name> -Algorithm SHA256
             ```
 
             ### ⚠️ Windows SmartScreen Notice
             Unsigned or newly signed open-source binaries may trigger Windows SmartScreen warnings ("Windows protected your PC").
             1. Click **"More info"** ("詳細情報").
             2. Click **"Run anyway"** ("実行").
+

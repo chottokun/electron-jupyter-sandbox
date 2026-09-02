@@ -36,14 +36,11 @@ generated:
 ### 1. タグトリガーによる自動ビルド & パッケージング
 `v*.*.*` タグのプッシュをトリガーに、Windows環境のランナーで `electron-builder` を実行してインストーラー（NSIS）およびポータブル版（`.zip`）を生成します。
 
-### 2. チェックサム自動生成とVirusTotal連携
+### 2. ローカル Defender スキャン・チェックサム生成・VirusTotal 連携
 
-```bash
-# SHA-256 チェックサムの生成
-sha256sum *.exe *.zip > SHA256SUMS.txt
-```
-
-CI内でVirusTotal APIを呼び出してスキャンを実行し、スキャン結果の公開URLをGitHub Releasesのリリースノートに自動挿入します。
+1. **Microsoft Defender CLI スキャン**: Windows ランナー上の `MpCmdRun.exe` で成果物（`dist` ディレクトリ）を直接スキャンし、マルウェア混入を事前に防御します。
+2. **SHA-256 チェックサム生成**: 各成果物のハッシュ値を計算して `SHA256SUMS.txt` を自動生成します。
+3. **VirusTotal レポート URL の動的生成**: 成果物（約450MB〜500MB）をAPI経由で毎回アップロードする負荷・タイムアウト・レート制限を回避するため、計算したSHA256ハッシュに基づいた VirusTotal 照会リンク（`https://www.virustotal.com/gui/file/<hash>`）を生成し、リリースノートに自動挿入します。
 
 ### 3. GitHub Releases への公開
 
