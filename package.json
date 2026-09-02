@@ -14,10 +14,13 @@
     "build:jupyter": "uv run jupyter lite build --config jupyter_lite_config.json",
     "build": "npm run build:ext && npm run build:jupyter",
     "start": "electron . --no-sandbox",
+    "start:configurable": "ALLOW_NETWORK_CONFIG=true electron . --no-sandbox",
     "package:win": "electron-builder --win --x64 --publish never",
+    "package:win:configurable": "ALLOW_NETWORK_CONFIG=true electron-builder --win --x64 --publish never",
     "package:mac": "electron-builder --mac --publish never",
     "package:linux": "electron-builder --linux AppImage --publish never"
   },
+
   "build": {
     "appId": "com.example.electron-jupyter-sandbox",
     "productName": "JupyterSandbox",

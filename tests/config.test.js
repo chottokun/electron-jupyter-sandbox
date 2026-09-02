@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { loadConfig, saveConfig, getResolvedDataDir } = require('../src/config');
+const { loadConfig, saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed } = require('../src/config');
 
 function createTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-config-test-'));
@@ -48,3 +48,25 @@ test('getResolvedDataDir resolves relative, absolute and default paths correctly
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('isExternalNetworkAllowed and setExternalNetworkAllowed behavior in Strict vs Configurable mode', () => {
+  const tmpDir = createTmpDir();
+  const configFilePath = path.join(tmpDir, 'config.json');
+
+  // 1. Strict モード（デフォルト）: config.json に true が保存されていても常に false
+  delete process.env.ALLOW_NETWORK_CONFIG;
+  setExternalNetworkAllowed(configFilePath, true);
+  assert.strictEqual(isExternalNetworkAllowed(configFilePath), false);
+
+  // 2. Configurable モード: ALLOW_NETWORK_CONFIG = 'true' の時は config.json の値が反映される
+  process.env.ALLOW_NETWORK_CONFIG = 'true';
+  assert.strictEqual(isExternalNetworkAllowed(configFilePath), true);
+
+  setExternalNetworkAllowed(configFilePath, false);
+  assert.strictEqual(isExternalNetworkAllowed(configFilePath), false);
+
+  // クリーンアップ
+  delete process.env.ALLOW_NETWORK_CONFIG;
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+

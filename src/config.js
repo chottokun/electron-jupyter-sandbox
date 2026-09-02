@@ -1,6 +1,8 @@
 const path = require('path');
 const fs = require('fs');
 
+const { isNetworkConfigurable } = require('./policy');
+
 function loadConfig(configFilePath) {
   try {
     if (fs.existsSync(configFilePath)) {
@@ -35,8 +37,37 @@ function getResolvedDataDir(appRootDir, configFilePath) {
   return path.join(appRootDir, 'data');
 }
 
+/**
+ * 外部ネットワーク通信が許可されているか判定
+ * ※ 完全隔離モード（isNetworkConfigurable === false）の場合は config.json の値に関わらず常に false
+ * 
+ * @param {string} configFilePath 
+ * @returns {boolean}
+ */
+function isExternalNetworkAllowed(configFilePath) {
+  if (!isNetworkConfigurable()) {
+    return false;
+  }
+  const config = loadConfig(configFilePath);
+  return config.allowExternalNetwork === true;
+}
+
+/**
+ * 外部ネットワーク通信設定を更新
+ * 
+ * @param {string} configFilePath 
+ * @param {boolean} allowed 
+ * @returns {boolean}
+ */
+function setExternalNetworkAllowed(configFilePath, allowed) {
+  return saveConfig(configFilePath, { allowExternalNetwork: Boolean(allowed) });
+}
+
 module.exports = {
   loadConfig,
   saveConfig,
-  getResolvedDataDir
+  getResolvedDataDir,
+  isExternalNetworkAllowed,
+  setExternalNetworkAllowed
 };
+

@@ -2,12 +2,14 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const { saveConfig, getResolvedDataDir } = require('./config');
+const { saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed } = require('./config');
 const { logger } = require('./logger');
 const { getSettingsDir, getOverridesPath } = require('./settings');
 const { startLocalServer } = require('./server');
 const { applyNetworkFilter } = require('./security');
 const { createApplicationMenu, setupContextMenu } = require('./menu');
+const { getSecurityMode, isNetworkConfigurable } = require('./policy');
+
 
 // アプリケーションのベースディレクトリ解決
 const appRootDir = app.isPackaged
@@ -167,7 +169,12 @@ function createWindow(port) {
     getLogPath: () => logger.getLogPath(currentDataDir),
     getLogDir: () => logger.getLogDir(currentDataDir),
     handleImportFile,
-    handleExportFile
+    handleExportFile,
+    isExternalNetworkAllowed: () => isExternalNetworkAllowed(configFilePath),
+    toggleExternalNetwork: async (newVal) => {
+      setExternalNetworkAllowed(configFilePath, newVal);
+      logger.log('SECURITY', `外部ネットワーク設定を更新しました: ${newVal ? '許可' : '遮断'}`, app.isPackaged, currentDataDir);
+    }
   });
   setupContextMenu(mainWindow);
 
@@ -196,18 +203,26 @@ if (!gotTheLock) {
       ? path.join(app.getAppPath(), 'jupyterlite')
       : path.resolve(__dirname, '../jupyterlite');
 
+    const securityMode = getSecurityMode();
+    const networkAllowed = isExternalNetworkAllowed(configFilePath);
     logger.log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`, app.isPackaged, currentDataDir);
+    logger.log('SECURITY', `Security Policy: ${securityMode} (Network Toggle Configurable: ${isNetworkConfigurable()}, External Network Allowed: ${networkAllowed})`, app.isPackaged, currentDataDir);
 
     const { server, port } = await startLocalServer(rootDir, currentDataDir);
     serverInstance = server;
 
     const logHandler = (cat, msg) => logger.log(cat, msg, app.isPackaged, currentDataDir);
-    applyNetworkFilter(session.defaultSession, logHandler);
-    applyNetworkFilter(session.fromPartition('persist:jupyter-data'), logHandler);
+    const networkFilterOptions = {
+      logFunc: logHandler,
+      isNetworkAllowed: () => isExternalNetworkAllowed(configFilePath)
+    };
+    applyNetworkFilter(session.defaultSession, networkFilterOptions);
+    applyNetworkFilter(session.fromPartition('persist:jupyter-data'), networkFilterOptions);
 
     createWindow(port);
   });
 }
+
 
 ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
