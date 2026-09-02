@@ -60,7 +60,35 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
       callback({ cancel: true });
     }
   });
+
+  // レスポンスヘッダー調整（CORS 緩和および CSP 動的適用）
+  if (targetSession.webRequest.onHeadersReceived) {
+    targetSession.webRequest.onHeadersReceived((details, callback) => {
+      const responseHeaders = { ...(details.responseHeaders || {}) };
+
+      if (isNetworkAllowed()) {
+        // 外部通信許可時: レンダラーおよび Pyodide からの fetch を通すため CORS を許可
+        responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+        responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS, HEAD'];
+        responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+
+        // CSP が存在する場合、connect-src に * を追加して fetch 遮断を解除
+        const cspKey = Object.keys(responseHeaders).find(k => k.toLowerCase() === 'content-security-policy');
+        if (cspKey && responseHeaders[cspKey]) {
+          responseHeaders[cspKey] = responseHeaders[cspKey].map(val => {
+            if (val.includes('connect-src')) {
+              return val.replace(/connect-src [^;]+/, "connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+            }
+            return val;
+          });
+        }
+      }
+
+      callback({ responseHeaders });
+    });
+  }
 }
+
 
 module.exports = {
   isAllowedUrl,

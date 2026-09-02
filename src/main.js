@@ -208,8 +208,9 @@ if (!gotTheLock) {
     logger.log('MAIN', `Starting app (isPackaged: ${app.isPackaged}, rootDir: ${rootDir}, dataDir: ${currentDataDir})`, app.isPackaged, currentDataDir);
     logger.log('SECURITY', `Security Policy: ${securityMode} (Network Toggle Configurable: ${isNetworkConfigurable()}, External Network Allowed: ${networkAllowed})`, app.isPackaged, currentDataDir);
 
-    const { server, port } = await startLocalServer(rootDir, currentDataDir);
+    const { server, port } = await startLocalServer(rootDir, currentDataDir, 58888, () => isExternalNetworkAllowed(configFilePath));
     serverInstance = server;
+
 
     const logHandler = (cat, msg) => logger.log(cat, msg, app.isPackaged, currentDataDir);
     const networkFilterOptions = {

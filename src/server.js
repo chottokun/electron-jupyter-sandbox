@@ -43,7 +43,7 @@ function resolveSafePath(rootDir, relativePath) {
   return filePath;
 }
 
-function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT) {
+function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT, isExternalNetworkAllowed = null) {
   return new Promise((resolve, reject) => {
     let serverPort = 0;
     const server = http.createServer((req, res) => {
@@ -68,14 +68,23 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT)
         const ext = path.extname(filePath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+        const allowExternal = typeof isExternalNetworkAllowed === 'function' ? isExternalNetworkAllowed() : false;
+        const connectSrc = allowExternal
+          ? "* 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
+          : "'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+        const imgSrc = allowExternal
+          ? "* 'self' data: blob:"
+          : "'self' data: blob:";
+
         res.writeHead(200, {
           'Content-Type': contentType,
-          'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; img-src 'self' data: blob:;",
+          'Content-Security-Policy': `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; connect-src ${connectSrc}; img-src ${imgSrc};`,
           'Cross-Origin-Opener-Policy': 'same-origin',
           'Cross-Origin-Embedder-Policy': 'require-corp',
           'Cross-Origin-Resource-Policy': 'same-origin',
           'Cache-Control': 'no-cache'
         });
+
 
         if (path.basename(filePath) === 'jupyter-lite.json') {
           try {
