@@ -87,7 +87,7 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
         responseHeaders['Access-Control-Allow-Headers'] = ['*'];
         responseHeaders['Cross-Origin-Resource-Policy'] = ['cross-origin'];
 
-        // CSP が存在する場合、connect-src / img-src に * を追加して fetch 遮断を解除
+        // CSP が存在する場合、connect-src / script-src / worker-src / img-src に * を追加して遮断を解除
         for (const key of Object.keys(responseHeaders)) {
           if (key.toLowerCase() === 'content-security-policy') {
             responseHeaders[key] = responseHeaders[key].map(val => {
@@ -97,6 +97,16 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
               } else {
                 updated = updated + "; connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
               }
+              if (updated.includes('script-src')) {
+                updated = updated.replace(/script-src [^;]+/, "script-src * 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; script-src * 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
+              if (updated.includes('worker-src')) {
+                updated = updated.replace(/worker-src [^;]+/, "worker-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; worker-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
               if (updated.includes('img-src')) {
                 updated = updated.replace(/img-src [^;]+/, "img-src * 'self' data: blob:");
               }
@@ -104,6 +114,7 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
             });
           }
         }
+
       }
 
       callback({ responseHeaders });

@@ -72,18 +72,22 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
         const connectSrc = allowExternal
           ? "* 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
           : "'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+        const scriptSrc = allowExternal
+          ? "* 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
+          : "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
         const imgSrc = allowExternal
           ? "* 'self' data: blob:"
           : "'self' data: blob:";
 
         res.writeHead(200, {
           'Content-Type': contentType,
-          'Content-Security-Policy': `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; connect-src ${connectSrc}; img-src ${imgSrc};`,
+          'Content-Security-Policy': `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; script-src ${scriptSrc}; connect-src ${connectSrc}; img-src ${imgSrc};`,
           'Cross-Origin-Opener-Policy': 'same-origin',
           'Cross-Origin-Embedder-Policy': 'credentialless',
           'Cross-Origin-Resource-Policy': 'cross-origin',
           'Cache-Control': 'no-cache'
         });
+
 
 
 
