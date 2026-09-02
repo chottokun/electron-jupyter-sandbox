@@ -24,8 +24,8 @@ generated:
 | **ランタイム管理 (Node)** | Volta | `2.0.2` | `package.json` でバージョン固定 |
 | **Node.js** | Node | `22.14.0` (LTS) | JupyterLab builder (`^20.19.0 || >=22.12.0`) & Electron 互換 |
 | **パッケージマネージャー** | npm | `10.9.2` | workspaces 機能でパッケージ分離 |
-| **デスクトップ基盤** | Electron | `^33.2.0` (33.4.11) | Chromium 130 相当 |
-| **パッケージング** | electron-builder | `^25.1.8` | Linux(AppImage)/Win/Mac 対応 |
+| **デスクトップ基盤** | Electron | `^44.1.1` (44.1.1) | セキュリティ脆弱性対応済み |
+| **パッケージング** | electron-builder | `^26.15.3` | Linux(AppImage)/Win/Mac 対応 (JSベースモジュールコレクタ) |
 | **Python 管理** | uv | `>=0.4.0` | `.venv` / `pyproject.toml` ローカル管理 |
 | **JupyterLite コア** | `jupyterlite-core` | `0.8.3` | JupyterLab 4.6.3 / Notebook 7.6.2 |
 | **Pyodide カーネル** | `jupyterlite-pyodide-kernel` | `0.8.5` | `piplite 0.8.5` 内包 |
