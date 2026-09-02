@@ -62,8 +62,15 @@ generated:
 Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
 ```
 
-### 2. Microsoftへの誤検知申請（False Positive Submission）手順
+### 2. VirusTotal への初期スキャン登録（推奨）
+新規生成されたバイナリは VirusTotal 側に初回登録されるまで「Item not found」となります。リリース後、以下の手順で一度スキャンを実行しておくと、全ユーザーが即座に検査レポートを閲覧できるようになります。
+1. [VirusTotal](https://www.virustotal.com/) にアクセスします。
+2. リリースされたバイナリ（`setup.exe` や `.zip`）をアップロードしてスキャンを実行します。
+3. 数分で各社アンチウイルスエンジン（70社以上）の解析が完了し、リリースノート記載のURLから恒久的に「Clean」レポートが参照可能になります。
+
+### 3. Microsoftへの誤検知申請（False Positive Submission）手順
 新規リリース直後、必要に応じて以下の手順で Microsoft にバイナリを送信し、安全判定を促進させます。
 1. **申請フォームにアクセス**: [Microsoft Security Intelligence 誤検知申請ポータル](https://www.microsoft.com/en-us/wdsi/filesubmission) にアクセスします。
 2. **ファイル送信**: 「Software Developer」を選択し、生成されたビルドバイナリ（`.exe`）を添付して送信します。
 3. **反映の確認**: 数日以内に Windows Defender / SmartScreen での安全判定が更新されます。
+
