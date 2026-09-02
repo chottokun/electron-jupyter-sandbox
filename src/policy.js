@@ -11,11 +11,23 @@ const SECURITY_MODES = {
 
 /**
  * ネットワーク接続の切り替えが許可されているビルドか判定
+ * 1. 開発時・実行時環境変数 ALLOW_NETWORK_CONFIG
+ * 2. ビルド時に埋め込まれた policy.json
+ * 
  * @returns {boolean}
  */
 function isNetworkConfigurable() {
-  return process.env.ALLOW_NETWORK_CONFIG === 'true';
+  if (process.env.ALLOW_NETWORK_CONFIG === 'true') {
+    return true;
+  }
+  try {
+    const policy = require('./policy.json');
+    return policy.configurable === true;
+  } catch (e) {
+    return false;
+  }
 }
+
 
 /**
  * 現在のセキュリティモード名を取得
