@@ -10,6 +10,10 @@ const { applyNetworkFilter } = require('./security');
 const { createApplicationMenu, setupContextMenu } = require('./menu');
 const { getSecurityMode, isNetworkConfigurable } = require('./policy');
 
+// Private Network Access (127.0.0.1 からの外部 fetch 制限) の解除
+app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights');
+
+
 
 // アプリケーションのベースディレクトリ解決
 const appRootDir = app.isPackaged

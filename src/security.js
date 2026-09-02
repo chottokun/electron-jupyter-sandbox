@@ -67,7 +67,21 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
       const responseHeaders = { ...(details.responseHeaders || {}) };
 
       if (isNetworkAllowed()) {
+        const removeCaseInsensitive = (headers, targetKey) => {
+          const lower = targetKey.toLowerCase();
+          for (const k of Object.keys(headers)) {
+            if (k.toLowerCase() === lower) {
+              delete headers[k];
+            }
+          }
+        };
+
         // 外部通信許可時: COEP環境下での外部リクエスト破棄を防ぐため CORP と CORS を付与
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Origin');
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Methods');
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Headers');
+        removeCaseInsensitive(responseHeaders, 'Cross-Origin-Resource-Policy');
+
         responseHeaders['Access-Control-Allow-Origin'] = ['*'];
         responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS, HEAD'];
         responseHeaders['Access-Control-Allow-Headers'] = ['*'];
@@ -95,6 +109,7 @@ function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
       callback({ responseHeaders });
     });
   }
+
 }
 
 

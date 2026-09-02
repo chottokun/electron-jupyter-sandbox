@@ -80,10 +80,11 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
           'Content-Type': contentType,
           'Content-Security-Policy': `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*; connect-src ${connectSrc}; img-src ${imgSrc};`,
           'Cross-Origin-Opener-Policy': 'same-origin',
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Resource-Policy': 'same-origin',
+          'Cross-Origin-Embedder-Policy': 'credentialless',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
           'Cache-Control': 'no-cache'
         });
+
 
 
         if (path.basename(filePath) === 'jupyter-lite.json') {
