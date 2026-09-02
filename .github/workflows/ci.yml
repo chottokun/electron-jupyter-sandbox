@@ -38,11 +38,11 @@ jobs:
       - name: Security audit (npm)
         run: npm audit --audit-level=high
 
-      - name: Run unit tests
-        run: npm test
-
       - name: Build project assets (Extensions + JupyterLite)
         run: npm run build
+
+      - name: Run unit tests
+        run: npm test
 
       - name: Verify build artifacts
         run: |
