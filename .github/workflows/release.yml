@@ -89,14 +89,32 @@ jobs:
             dist/*.exe
             dist/*.zip
 
+      - name: Resolve Release Tag
+        id: resolve_tag
+        shell: pwsh
+        run: |
+          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $tag = $env:GITHUB_REF_NAME
+            $isPrerelease = $tag -match "alpha|beta|rc|snapshot|test"
+          } else {
+            $tag = "v${pkgVersion}-snapshot"
+            $isPrerelease = $true
+          }
+          Write-Host "Resolved Tag: $tag (Prerelease: $isPrerelease)"
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "IS_PRERELEASE=$isPrerelease" >> $env:GITHUB_ENV
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0-snapshot' }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          prerelease: ${{ env.IS_PRERELEASE == 'True' }}
           files: |
             dist/*.exe
             dist/*.zip
             dist/SHA256SUMS.txt
+
           body: |
             ## 📦 Release Assets
             - **Installer (NSIS)**: `setup.exe`
