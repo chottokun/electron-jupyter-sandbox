@@ -133,12 +133,13 @@ function createWindow(port) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true,
+      webSecurity: false,
       sandbox: true,
       partition: 'persist:jupyter-data',
       preload: path.join(__dirname, 'preload.js')
     }
   });
+
 
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
