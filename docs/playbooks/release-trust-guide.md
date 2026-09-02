@@ -36,18 +36,18 @@ generated:
 ### 1. タグトリガーによる自動ビルド & パッケージング
 `v*.*.*` タグのプッシュをトリガーに、Windows環境のランナーで `electron-builder` を実行してインストーラー（NSIS）およびポータブル版（`.zip`）を生成します。
 
-### 2. ローカル Defender スキャン・チェックサム生成・VirusTotal 連携
+### 2. ローカル Defender スキャン・チェックサム生成・SLSA 署名
 
 1. **Microsoft Defender CLI スキャン**: Windows ランナー上の `MpCmdRun.exe` で成果物（`dist` ディレクトリ）を直接スキャンし、マルウェア混入を事前に防御します。
-2. **SHA-256 チェックサム生成**: 各成果物のハッシュ値を計算して `SHA256SUMS.txt` を自動生成します。
-3. **VirusTotal レポート URL の動的生成**: 成果物（約450MB〜500MB）をAPI経由で毎回アップロードする負荷・タイムアウト・レート制限を回避するため、計算したSHA256ハッシュに基づいた VirusTotal 照会リンク（`https://www.virustotal.com/gui/file/<hash>`）を生成し、リリースノートに自動挿入します。
+2. **SHA-256 チェックサム生成**: 各成果物のハッシュ値を計算して `SHA256SUMS.txt` を自動生成し、Release アセットとして添付します。
+3. **SLSA Provenance (Artifact Attestations)**: GitHub公式の OIDC 署名機構（`actions/attest-build-provenance`）を用いて、CIビルドの真正性を暗号学的に証明・記録します。
 
 ### 3. GitHub Releases への公開
 
 * インストーラー（`setup.exe`）
 * ポータブル版（解凍するだけで動く `.zip`）
 * `SHA256SUMS.txt`
-* リリースノート（変更履歴、VirusTotalレポートURL、ハッシュ検証用PowerShellコマンド）
+* リリースノート（SLSA Provenance 検証手順、PowerShell ハッシュ検証コマンド、SmartScreen 注意事項）
 
 ---
 
@@ -62,11 +62,6 @@ generated:
 Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
 ```
 
-### 2. VirusTotal への初期スキャン登録（推奨）
-新規生成されたバイナリは VirusTotal 側に初回登録されるまで「Item not found」となります。リリース後、以下の手順で一度スキャンを実行しておくと、全ユーザーが即座に検査レポートを閲覧できるようになります。
-1. [VirusTotal](https://www.virustotal.com/) にアクセスします。
-2. リリースされたバイナリ（`setup.exe` や `.zip`）をアップロードしてスキャンを実行します。
-3. 数分で各社アンチウイルスエンジン（70社以上）の解析が完了し、リリースノート記載のURLから恒久的に「Clean」レポートが参照可能になります。
 
 ### 3. Microsoftへの誤検知申請（False Positive Submission）手順
 新規リリース直後、必要に応じて以下の手順で Microsoft にバイナリを送信し、安全判定を促進させます。
