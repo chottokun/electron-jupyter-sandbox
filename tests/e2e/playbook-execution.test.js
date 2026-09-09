@@ -4,8 +4,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
-const { startLocalServer } = require('../src/server');
-const { saveConfig } = require('../src/config');
+const { startLocalServer } = require('../../src/server');
+const { saveConfig } = require('../../src/config');
 
 function createTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-playbook-test-'));
@@ -16,7 +16,7 @@ test('Playbook recipes execute seamlessly without piplite.install or ModuleNotFo
   const dataDir = path.join(tmpDir, 'data');
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const jupyterliteDir = path.join(__dirname, '../jupyterlite');
+  const jupyterliteDir = path.join(__dirname, '../../jupyterlite');
   const configPath = path.join(tmpDir, 'config.json');
 
   saveConfig(configPath, {

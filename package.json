@@ -9,10 +9,11 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "npm run set-policy:strict && node --test tests/**/*.test.js",
+    "test": "npm run set-policy:strict && node --test tests/*.test.js",
+    "test:e2e": "npm run set-policy:strict && node --test tests/e2e/*.test.js",
     "test:simulation": "npm run set-policy:strict && node tests/simulation.js",
     "build:ext": "npm run --workspace=@electron-jupyter-sandbox/ai-copy-extension build",
-    "build:jupyter": "uv run jupyter lite build --config jupyter_lite_config.json",
+    "build:jupyter": "uv run jupyter lite build --config jupyter_lite_config.json && node scripts/patch_workers.js",
     "build": "npm run build:ext && npm run build:jupyter",
     "set-policy:strict": "node -e \"const fs = require('fs'); fs.writeFileSync('./src/policy.json', JSON.stringify({ configurable: false }, null, 2) + '\\n')\"",
     "set-policy:configurable": "node -e \"const fs = require('fs'); fs.writeFileSync('./src/policy.json', JSON.stringify({ configurable: true }, null, 2) + '\\n')\"",
