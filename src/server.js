@@ -4,6 +4,7 @@ const fs = require('fs');
 const url = require('url');
 const { logger } = require('./logger');
 const { loadOverrides } = require('./settings');
+const { getCategorizedPreloadPackages } = require('./config');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -50,6 +51,7 @@ function resolveSafePath(rootDir, relativePath) {
 
 function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT, isExternalNetworkAllowed = null) {
   return new Promise((resolve, reject) => {
+    const configFilePath = path.join(path.dirname(currentDataDir), 'config.json');
     let serverPort = 0;
     const server = http.createServer((req, res) => {
       try {
@@ -99,14 +101,32 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
         if (path.basename(filePath) === 'jupyter-lite.json') {
           try {
             const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const userOverrides = loadOverrides(currentDataDir);
-            if (userOverrides) {
-              baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
-              baseContent['jupyter-config-data']['settingsOverrides'] = {
-                ...(baseContent['jupyter-config-data']['settingsOverrides'] || {}),
-                ...userOverrides
-              };
-            }
+            const userOverrides = loadOverrides(currentDataDir) || {};
+
+            baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
+            const existingOverrides = baseContent['jupyter-config-data']['settingsOverrides'] || {};
+
+            const { pyodidePackages, piplitePackages } = getCategorizedPreloadPackages(configFilePath);
+            const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
+
+            const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || {};
+            const existingLoadPyodideOptions = existingKernelSettings.loadPyodideOptions || {};
+
+            const mergedKernelSettings = {
+              ...existingKernelSettings,
+              loadPyodideOptions: {
+                ...existingLoadPyodideOptions,
+                packages: pyodidePackages
+              },
+              piplitePreloadPackages: piplitePackages
+            };
+
+            baseContent['jupyter-config-data']['settingsOverrides'] = {
+              ...existingOverrides,
+              ...userOverrides,
+              [kernelPluginId]: mergedKernelSettings
+            };
+
             return res.end(JSON.stringify(baseContent, null, 2));
           } catch (err) {
             logger.log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);

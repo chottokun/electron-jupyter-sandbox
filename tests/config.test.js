@@ -3,7 +3,18 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { loadConfig, saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed, resetRuntimeNetworkAllowed } = require('../src/config');
+const {
+  DEFAULT_PRELOAD_PACKAGES,
+  loadConfig,
+  saveConfig,
+  getResolvedDataDir,
+  isExternalNetworkAllowed,
+  setExternalNetworkAllowed,
+  resetRuntimeNetworkAllowed,
+  getPreloadPackages,
+  isPreloadPackageEnabled,
+  setPreloadPackageEnabled
+} = require('../src/config');
 
 
 function createTmpDir() {
@@ -75,4 +86,31 @@ test('isExternalNetworkAllowed and setExternalNetworkAllowed behavior in Strict 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('getPreloadPackages, isPreloadPackageEnabled, and setPreloadPackageEnabled behavior', () => {
+  const tmpDir = createTmpDir();
+  const configFilePath = path.join(tmpDir, 'config.json');
+
+  // 1. デフォルト値の検証
+  assert.deepStrictEqual(getPreloadPackages(configFilePath), DEFAULT_PRELOAD_PACKAGES);
+  assert.strictEqual(isPreloadPackageEnabled(configFilePath, 'japanize-noto-sans-jp'), true);
+  assert.strictEqual(isPreloadPackageEnabled(configFilePath, 'pandas'), false);
+
+  // 2. パッケージの有効化
+  setPreloadPackageEnabled(configFilePath, 'pandas', true);
+  assert.strictEqual(isPreloadPackageEnabled(configFilePath, 'pandas'), true);
+  assert.ok(getPreloadPackages(configFilePath).includes('pandas'));
+
+  // 3. パッケージの無効化
+  setPreloadPackageEnabled(configFilePath, 'matplotlib', false);
+  assert.strictEqual(isPreloadPackageEnabled(configFilePath, 'matplotlib'), false);
+  assert.strictEqual(getPreloadPackages(configFilePath).includes('matplotlib'), false);
+
+  // 4. 重複追加の防止
+  setPreloadPackageEnabled(configFilePath, 'pandas', true);
+  const currentList = getPreloadPackages(configFilePath);
+  const pandasCount = currentList.filter(p => p === 'pandas').length;
+  assert.strictEqual(pandasCount, 1);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
 
