@@ -43,8 +43,9 @@ generated:
 | **reportlab** | `5.0.1` | `reportlab-5.0.1-py3-none-any.whl` | `1c36e6bb...` | `pillow`*, `charset-normalizer`* | BSD-3-Clause | PDF 帳票・グラフィック・レイアウト描画生成 |
 | **tabulate** | `0.10.0` | `tabulate-0.10.0-py3-none-any.whl` | `f0b0622e...` | なし | MIT | 2次元データ・テーブルの綺麗なテキスト/Markdown整形 |
 | **defusedxml** | `0.7.1` | `defusedxml-0.7.1-py2.py3-none-any.whl` | `a352e7e4...` | なし | Python-2.0 (PSF) | XML 爆弾・エンティティ展開等の脆弱性防御 |
+| **matplotlib-fontja** | `1.1.0` | `matplotlib_fontja-1.1.0-py2.py3-none-any.whl` | `3715d2fb...` | `matplotlib`* | MIT / IPA Font | Matplotlib 日本語フォント（IPAexゴシック）自動適用・豆腐解消 |
 
-> `*` マークの付いた依存パッケージ（`lxml`, `pillow`, `typing-extensions`, `charset-normalizer`）は、Pyodide 内部に Wasm 最適化済みバイナリとして同梱されているため、余計な外部 wheel の二重取得を防止して Pyodide 提供版を優先利用します。
+> `*` マークの付いた依存パッケージ（`matplotlib`, `lxml`, `pillow`, `typing-extensions`, `charset-normalizer`）は、Pyodide 内部に Wasm 最適化済みバイナリとして同梱されているため、余計な外部 wheel の二重取得を防止して Pyodide 提供版を優先利用します。
 
 ### ノートブックでの呼び出し例
 

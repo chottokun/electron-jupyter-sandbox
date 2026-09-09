@@ -327,6 +327,13 @@ class TestPresets:
     def test_officeプリセットにpypdfが含まれる(self):
         assert "pypdf" in add_wheels.PRESETS["office"]
 
+    def test_officeプリセットにmatplotlib_fontjaが含まれる(self):
+        assert "matplotlib-fontja" in add_wheels.PRESETS["office"]
+
+    def test_japaneseプリセットが定義されている(self):
+        assert "japanese" in add_wheels.PRESETS
+        assert "matplotlib-fontja" in add_wheels.PRESETS["japanese"]
+
 
 # --- ライブ統合テスト（ネットワーク必要） ---
 

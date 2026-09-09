@@ -56,9 +56,15 @@ graph TD
 | パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
 | :--- | :--- | :--- | :--- |
 | **`matplotlib`** | そのまま `import` | 2D/3D グラフ描画（折れ線、散布図、ヒストグラム等） | `import matplotlib.pyplot as plt` |
+| **`matplotlib-fontja`** | `piplite.install` | **Matplotlibの日本語豆腐（文字化け）解消**。IPAexゴシックを自動適用 | `import matplotlib_fontja` |
 | **`seaborn`** | そのまま `import` | 統計データの美しいグラフィック可視化、ヒートマップ | `import seaborn as sns` |
 | **`bokeh`** | そのまま `import` | インタラクティブな Web チャート生成 | `import bokeh` |
 | **`altair`** | そのまま `import` | 宣言的な統計ビジュアライゼーション | `import altair as alt` |
+
+> [!TIP]
+> **Matplotlib の日本語豆腐（文字化け）について**:
+> Pyodide のデフォルト環境には欧文フォント（DejaVu Sans）のみが含まれているため、そのまま日本語を描画すると豆腐（□）になります。
+> 同梱されている **`matplotlib-fontja`** を `await piplite.install(['matplotlib-fontja'])` して `import matplotlib_fontja` を1行追加するだけで、IPAexゴシックフォントが自動設定され、すべてのグラフで日本語が綺麗に表示されます（外部通信不要・完全オフライン）。
 
 ### 📑 オフィスドキュメント操作（Excel・Word・PowerPoint・PDF）
 | パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
@@ -83,23 +89,30 @@ graph TD
 
 ## 3. クイックスタート・利用コード例
 
-### 例1: データ分析とグラフ作成（即座に実行可能）
+### 例1: データ分析とグラフ作成（日本語フォント対応）
 ```python
+# 1. 日本語フォントパッケージをオフラインインストール
+import piplite
+await piplite.install(['matplotlib-fontja'])
+
+# 2. パッケージをインポート（import matplotlib_fontja で日本語が自動適用）
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib_fontja
 
-# データの作成
+# 3. データの作成
 np.random.seed(42)
 df = pd.DataFrame({
     '月': [f'{i}月' for i in range(1, 13)],
     '売上': np.random.randint(100, 300, size=12)
 })
 
-# グラフ描画
+# 4. グラフ描画（日本語が豆腐にならず正常に表示されます）
 plt.figure(figsize=(8, 4))
 plt.bar(df['月'], df['売上'], color='steelblue')
 plt.title('月別売上推移')
+plt.xlabel('年月')
 plt.ylabel('売上 (万円)')
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()

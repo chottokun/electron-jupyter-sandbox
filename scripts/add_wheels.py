@@ -41,14 +41,18 @@ PYODIDE_LOCK_PATH = PROJECT_ROOT / "jupyterlite" / "static" / "pyodide" / "pyodi
 # プリセット定義
 PRESETS = {
     "office": [
-        "openpyxl",       # Excel読み書き (.xlsx)
-        "xlsxwriter",     # Excel書き込み (.xlsx)
-        "python-docx",    # Word読み書き (.docx)
-        "python-pptx",    # PowerPoint読み書き (.pptx)
-        "pypdf",          # PDF読み書き
-        "tabulate",       # テーブル整形出力
-        "reportlab",      # PDF生成
-        "defusedxml",     # セキュアXML解析
+        "openpyxl",           # Excel読み書き (.xlsx)
+        "xlsxwriter",         # Excel書き込み (.xlsx)
+        "python-docx",        # Word読み書き (.docx)
+        "python-pptx",        # PowerPoint読み書き (.pptx)
+        "pypdf",              # PDF読み書き
+        "tabulate",           # テーブル整形出力
+        "reportlab",          # PDF生成
+        "defusedxml",         # セキュアXML解析
+        "matplotlib-fontja",  # Matplotlib 日本語フォント（IPAexゴシック）
+    ],
+    "japanese": [
+        "matplotlib-fontja",  # Matplotlib 日本語フォント（IPAexゴシック）
     ],
 }
 
@@ -247,24 +251,33 @@ def download_wheel(url: str, filename: str, expected_sha256: str) -> bool:
     return True
 
 
-def save_manifest(resolved: dict) -> None:
+def save_manifest(resolved: dict, merge: bool = True) -> None:
     """マニフェストファイルを生成・更新"""
     from datetime import datetime, timezone
 
-    manifest = {
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "pyodideLockPath": str(PYODIDE_LOCK_PATH.relative_to(PROJECT_ROOT)),
-        "packages": {},
-    }
+    existing_packages = {}
+    if merge and MANIFEST_PATH.exists():
+        try:
+            old_manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+            existing_packages = old_manifest.get("packages", {})
+        except Exception:
+            pass
 
+    packages = dict(existing_packages)
     for norm_name, info in sorted(resolved.items()):
-        manifest["packages"][norm_name] = {
+        packages[norm_name] = {
             "name": info["name"],
             "version": info["version"],
             "filename": info["filename"],
             "sha256": info["sha256"],
             "dependencies": info["dependencies"],
         }
+
+    manifest = {
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "pyodideLockPath": str(PYODIDE_LOCK_PATH.relative_to(PROJECT_ROOT)),
+        "packages": dict(sorted(packages.items())),
+    }
 
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\n📋 マニフェスト更新: {MANIFEST_PATH.relative_to(PROJECT_ROOT)}")
@@ -415,7 +428,7 @@ def main():
             fail_count += 1
 
     # マニフェスト生成
-    save_manifest(resolved)
+    save_manifest(resolved, merge=not args.clean)
 
     # サマリー
     print(f"\n{'=' * 50}")
