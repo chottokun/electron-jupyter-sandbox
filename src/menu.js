@@ -22,8 +22,32 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     handleImportFile = async () => {},
     handleExportFile = async () => {},
     isExternalNetworkAllowed = () => false,
-    toggleExternalNetwork = async () => {}
+    toggleExternalNetwork = async () => {},
+    isPreloadPackageEnabled = () => false,
+    togglePreloadPackage = async () => {}
   } = handlers;
+
+  const createPackageCheckbox = (pkgName, label) => ({
+    label,
+    type: 'checkbox',
+    checked: isPreloadPackageEnabled(pkgName),
+    click: async (menuItem) => {
+      const enabled = menuItem.checked;
+      await togglePreloadPackage(pkgName, enabled);
+      const reloadChoice = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'カーネル設定の更新',
+        message: `ライブラリ [${pkgName}] のプリロード設定を変更しました。`,
+        detail: 'カーネル起動時のライブラリ設定を更新するには、ページを再読み込みしてください。今すぐ再読み込みしますか？'
+      });
+      if (reloadChoice.response === 0) {
+        mainWindow.reload();
+      }
+    }
+  });
 
 
   const template = [
@@ -116,6 +140,30 @@ function createApplicationMenu(mainWindow, handlers = {}) {
               { role: 'window', label: 'ウィンドウ' }
             ]
           : [{ role: 'close', label: '閉じる' }])
+      ]
+    },
+
+    // ライブラリ メニュー
+    {
+      label: 'ライブラリ',
+      submenu: [
+        { label: '--- ローカル追加パッケージ (wheels) ---', enabled: false },
+        createPackageCheckbox('japanize-noto-sans-jp', 'japanize-noto-sans-jp (日本語フォント・設定)'),
+        createPackageCheckbox('openpyxl', 'openpyxl (Excel 入出力)'),
+        createPackageCheckbox('python-docx', 'python-docx (Word 操作)'),
+        createPackageCheckbox('python-pptx', 'python-pptx (PowerPoint 操作)'),
+        createPackageCheckbox('pypdf', 'pypdf (PDF 操作)'),
+        createPackageCheckbox('reportlab', 'reportlab (PDF 帳票生成)'),
+        createPackageCheckbox('tabulate', 'tabulate (テキスト表フォーマット)'),
+        createPackageCheckbox('xlsxwriter', 'xlsxwriter (Excel 高速生成)'),
+        { type: 'separator' },
+        { label: '--- Pyodide標準分析パッケージ ---', enabled: false },
+        createPackageCheckbox('matplotlib', 'matplotlib (グラフ描画)'),
+        createPackageCheckbox('pandas', 'pandas (データ分析)'),
+        createPackageCheckbox('numpy', 'numpy (数値計算)'),
+        createPackageCheckbox('scipy', 'scipy (科学技術計算)'),
+        createPackageCheckbox('scikit-learn', 'scikit-learn (機械学習)'),
+        createPackageCheckbox('sympy', 'sympy (代数計算・微積分)')
       ]
     },
 

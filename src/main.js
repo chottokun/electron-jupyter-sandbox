@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const { saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed } = require('./config');
+const { saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed, isPreloadPackageEnabled, setPreloadPackageEnabled } = require('./config');
 const { logger } = require('./logger');
 const { getSettingsDir, getOverridesPath } = require('./settings');
 const { startLocalServer } = require('./server');
@@ -191,6 +191,11 @@ function createWindow(port) {
     toggleExternalNetwork: async (newVal) => {
       setExternalNetworkAllowed(configFilePath, newVal);
       logger.log('SECURITY', `外部ネットワーク設定を更新しました: ${newVal ? '許可' : '遮断'}`, app.isPackaged, currentDataDir);
+    },
+    isPreloadPackageEnabled: (pkgName) => isPreloadPackageEnabled(configFilePath, pkgName),
+    togglePreloadPackage: async (pkgName, enabled) => {
+      setPreloadPackageEnabled(configFilePath, pkgName, enabled);
+      logger.log('PRELOAD', `プリロードパッケージ設定を更新しました: ${pkgName} -> ${enabled ? '有効' : '無効'}`, app.isPackaged, currentDataDir);
     }
   });
   setupContextMenu(mainWindow);

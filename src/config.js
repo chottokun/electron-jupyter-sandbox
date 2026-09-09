@@ -3,6 +3,12 @@ const fs = require('fs');
 
 const { isNetworkConfigurable } = require('./policy');
 
+const DEFAULT_PRELOAD_PACKAGES = [
+  'japanize-noto-sans-jp',
+  'matplotlib',
+  'openpyxl'
+];
+
 let runtimeNetworkAllowed = null;
 
 function loadConfig(configFilePath) {
@@ -87,13 +93,62 @@ function resetRuntimeNetworkAllowed() {
   runtimeNetworkAllowed = null;
 }
 
+/**
+ * プリロードパッケージ一覧を取得
+ * @param {string} [configFilePath]
+ * @returns {string[]}
+ */
+function getPreloadPackages(configFilePath = null) {
+  if (configFilePath) {
+    const config = loadConfig(configFilePath);
+    if (Array.isArray(config.preloadPackages)) {
+      return config.preloadPackages;
+    }
+  }
+  return [...DEFAULT_PRELOAD_PACKAGES];
+}
+
+/**
+ * 対象パッケージがプリロード対象か判定
+ * @param {string} configFilePath
+ * @param {string} packageName
+ * @returns {boolean}
+ */
+function isPreloadPackageEnabled(configFilePath, packageName) {
+  const list = getPreloadPackages(configFilePath);
+  return list.includes(packageName);
+}
+
+/**
+ * プリロードパッケージの有効化/無効化を設定
+ * @param {string} configFilePath
+ * @param {string} packageName
+ * @param {boolean} enabled
+ * @returns {boolean}
+ */
+function setPreloadPackageEnabled(configFilePath, packageName, enabled) {
+  let list = getPreloadPackages(configFilePath);
+  if (enabled) {
+    if (!list.includes(packageName)) {
+      list = [...list, packageName];
+    }
+  } else {
+    list = list.filter((p) => p !== packageName);
+  }
+  return saveConfig(configFilePath, { preloadPackages: list });
+}
+
 module.exports = {
+  DEFAULT_PRELOAD_PACKAGES,
   loadConfig,
   saveConfig,
   getResolvedDataDir,
   isExternalNetworkAllowed,
   setExternalNetworkAllowed,
-  resetRuntimeNetworkAllowed
+  resetRuntimeNetworkAllowed,
+  getPreloadPackages,
+  isPreloadPackageEnabled,
+  setPreloadPackageEnabled
 };
 
 

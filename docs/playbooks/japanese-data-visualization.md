@@ -53,14 +53,11 @@ sequenceDiagram
 タイトル、軸ラベル、凡例、グリッドを含む標準的な月別売上・利益グラフです。
 
 ```python
-# 1. パッケージのオフラインロード (初回のみ)
-import piplite
-await piplite.install(['japanize-noto-sans-jp'])
-
-# 2. SVG 描画設定（超高精細・ネイティブレンダリング）
+# 1. SVG 描画設定（超高精細・ネイティブレンダリング）
+# ※ プリロード機能により japanize-noto-sans-jp や matplotlib は自動読み込み済のため piplite.install は不要です
 %config InlineBackend.figure_format = 'svg'
 
-# 3. インポート（フォントとSVG設定が自動適用）
+# 2. インポート（フォントとSVG設定が自動適用）
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -103,8 +100,6 @@ plt.show()
 Seaborn のテーマを適用しつつ、日本語フォントを維持するパターンです。
 
 ```python
-import piplite
-await piplite.install(['japanize-noto-sans-jp'])
 %config InlineBackend.figure_format = 'svg'
 
 import seaborn as sns
@@ -134,8 +129,6 @@ plt.show()
 Excel ワークブックを新規作成し、そのデータを読み込んで日本語グラフを作成する一連の流れです。
 
 ```python
-import piplite
-await piplite.install(['openpyxl', 'japanize-noto-sans-jp'])
 %config InlineBackend.figure_format = 'svg'
 
 import openpyxl
