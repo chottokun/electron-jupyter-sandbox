@@ -146,6 +146,9 @@ function createWindow(port) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // Pyodide (Python WASM) からの外部リクエストおよび SharedArrayBuffer/WASM 実行を許可するため
+      // Chromium の webSecurity を false に設定。
+      // ※ 通信の制御と完全隔離は applyNetworkFilter (onBeforeRequest / onHeadersReceived) の多層防御機構によって安全に保証されます。
       webSecurity: false,
       sandbox: true,
       partition: 'persist:jupyter-data',

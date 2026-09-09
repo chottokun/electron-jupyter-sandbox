@@ -1,6 +1,6 @@
-const { isNetworkConfigurable, getSecurityMode } = require('./src/policy');
-const { isExternalNetworkAllowed, setExternalNetworkAllowed } = require('./src/config');
-const { isAllowedUrl, applyNetworkFilter } = require('./src/security');
+const { isNetworkConfigurable, getSecurityMode } = require('../src/policy');
+const { isExternalNetworkAllowed, setExternalNetworkAllowed } = require('../src/config');
+const { isAllowedUrl, applyNetworkFilter } = require('../src/security');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
