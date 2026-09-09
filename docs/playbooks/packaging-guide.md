@@ -39,38 +39,47 @@ npm run package:linux
 
 ---
 
-### 🪟 Windows (`.exe` / `.zip`)
+### 🪟 Windows (`.zip` ポータブル配布パッケージ)
 
-Windows 向けのバイナリ生成には、**「GitHub Actions による自動生成」** と **「ローカル環境（Linux）での生成」** の2通りがあります。
+Windows 向けには、**アンチウイルス（EDR / Windows Defender）の誤検知（False Positive）を根本から防止するため、インストーラー（自己解凍スタブ）ではなく静的展開型の「ポータブル Zip 形式」を採用**しています。
+
+> [!TIP]
+> **なぜ Zip ポータブル形式なのか？**:
+> インストーラー（NSIS）や単一 Portable exe は、実行時に一時ディレクトリ（`%TEMP%`）へ動的にバイナリを展開してサブプロセスを起動する自己解凍動作を行います。無署名アプリの場合、この挙動がマルウェアのドロッパーと誤認され、アンチウイルスに隔離・削除されやすくなります。
+> 静的展開型の Zip 形式であれば、動的ドロップ挙動がなく、事前スキャンが容易なため最も誤検知されにくく、管理者権限（UAC）不要で安全に動作します。
 
 #### A. GitHub Actions クラウド自動ビルド（推奨）
 Windows 仮想マシン上でビルド・署名・SLSA 来歴証明の添付を全自動で行い、[GitHub Releases](https://github.com/chottokun/electron-jupyter-sandbox/releases) に公開します：
 ```bash
 # タグを打ってプッシュ（正式リリース時）
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.1
+git push origin v1.1.1
 
 # または GitHub CLI から手動実行
 gh workflow run release.yml
 ```
 
 #### B. ローカル（Linux）でのビルド
-Linux 上で Windows 向けインストーラー（NSIS）をコンパイルするには `wine` が必要です：
 ```bash
-# 1. Wine のインストール（未導入の場合）
-sudo apt update && sudo apt install -y wine
-
-# 2. パッケージング実行
 npm run package:win
 ```
 
-#### 生成物一覧 (`dist/`)
-| ファイル名 | 形式 | 用途 |
-| :--- | :--- | :--- |
-| `JupyterSandbox Setup 1.0.0.exe` | インストーラー (NSIS) | Windows PC への標準インストール（ショートカット作成対応） |
-| `JupyterSandbox 1.0.0.exe` | 単体ポータブル exe | インストール不要の単体実行形式 |
-| `JupyterSandbox-1.0.0-win.zip` | ポータブル ZIP | 解凍してUSBメモリ等で持ち運べる完全ポータブル版 |
-| `win-unpacked/` | 展開済みフォルダ | 展開された実行ファイル群（`JupyterSandbox.exe`） |
+#### 生成物と解凍後のファイル構成 (`dist/`)
+- **生成物**: `dist/JupyterSandbox-<version>-windows.zip`
+
+解凍したフォルダには、`electron-builder` の `extraFiles` 機能により、ユーザーが大量の DLL の中から探す手間をなくすための起動バッチと案内テキストが**フォルダ最上部に自動配置**されます。
+
+```text
+JupyterSandbox-<version>-windows/
+├── 00_JupyterSandbox起動.bat    ← ★ ダブルクリックで即起動（最上部に表示）
+├── 00_はじめにお読みください.txt ← 利用案内・注意事項
+├── JupyterSandbox.exe           ← アプリ本体
+├── ffmpeg.dll, d3dcompiler.dll, ... (内部ランタイムDLL)
+├── locales/
+└── resources/
+```
+
+- **エンドユーザーへの配布方法**: `JupyterSandbox-<version>-windows.zip` をそのまま配布し、解凍して「`00_JupyterSandbox起動.bat`」を実行するよう案内します。
 
 ---
 

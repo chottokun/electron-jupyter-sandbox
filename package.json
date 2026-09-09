@@ -50,15 +50,15 @@
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "nsis",
-        "portable",
         "zip"
+      ],
+      "artifactName": "${productName}-${version}-windows.${ext}",
+      "extraFiles": [
+        {
+          "from": "build/win-extras",
+          "to": "."
+        }
       ]
-    },
-    "nsis": {
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "oneClick": false
     },
     "mac": {
       "icon": "build/icon.icns",
