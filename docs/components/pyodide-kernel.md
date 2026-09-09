@@ -94,7 +94,7 @@ graph TD
 ```python
 # 1. 超軽量 Google 日本語フォントパッケージをオフラインインストール
 import piplite
-await piplite.install(['./pypi/japanize_noto_sans_jp-1.0.0-py3-none-any.whl'])
+await piplite.install(['japanize-noto-sans-jp'])
 
 # 2. グラフ表示をベクターSVG形式に設定（Electron側で超高精細・ネイティブ描画）
 %config InlineBackend.figure_format = 'svg'

@@ -55,7 +55,7 @@ sequenceDiagram
 ```python
 # 1. パッケージのオフラインロード (初回のみ)
 import piplite
-await piplite.install(['./pypi/japanize_noto_sans_jp-1.0.0-py3-none-any.whl'])
+await piplite.install(['japanize-noto-sans-jp'])
 
 # 2. SVG 描画設定（超高精細・ネイティブレンダリング）
 %config InlineBackend.figure_format = 'svg'
@@ -104,7 +104,7 @@ Seaborn のテーマを適用しつつ、日本語フォントを維持するパ
 
 ```python
 import piplite
-await piplite.install(['./pypi/japanize_noto_sans_jp-1.0.0-py3-none-any.whl'])
+await piplite.install(['japanize-noto-sans-jp'])
 %config InlineBackend.figure_format = 'svg'
 
 import seaborn as sns
@@ -135,7 +135,7 @@ Excel ワークブックを新規作成し、そのデータを読み込んで�
 
 ```python
 import piplite
-await piplite.install(['openpyxl', './pypi/japanize_noto_sans_jp-1.0.0-py3-none-any.whl'])
+await piplite.install(['openpyxl', 'japanize-noto-sans-jp'])
 %config InlineBackend.figure_format = 'svg'
 
 import openpyxl
@@ -238,8 +238,6 @@ PNG（ラスター画像）と違い、SVG（ベクター画像）はディス�
 本パッケージは **JIS第1水準（2,965字）＋常用漢字** を収録しています。一般的なビジネス単語、売上科目、都道府県名、一般的な人名は 100% 網羅されています。もし極めて稀少な漢字が必要な場合は、SVG 形式（`figure_format = 'svg'`）で出力すれば、描画自体は OS 側のフォントが使われるため正しく表示されます。
 
 ### Q4. `Can't fetch metadata for 'japanize-noto-sans-jp'` エラーが出る場合は？
-`japanize-noto-sans-jp` は外部 PyPI ではなく本環境にローカル同梱された独自パッケージです。ブラウザや Pyodide カーネルのキャッシュ状態によりパッケージ名解決でエラーとなる場合は、レシピの通り **wheel ファイルの相対パスを直接指定** してください：
-```python
-await piplite.install(['./pypi/japanize_noto_sans_jp-1.0.0-py3-none-any.whl'])
-```
-パス指定を行うことで、インデックス検索や外部 PyPI への問い合わせをバイパスし、確実に即座にロードされます。
+`japanize-noto-sans-jp` はローカル同梱の独自ビルドパッケージです。
+通常は他のパッケージと同様に `await piplite.install(['japanize-noto-sans-jp'])` だけでロードされます。
+もし過去の古いキャッシュがブラウザや Pyodide に残っている場合は、画面をリロード（`Ctrl + R`）し、カーネルを再起動（Kernel -> Restart Kernel）してください。
