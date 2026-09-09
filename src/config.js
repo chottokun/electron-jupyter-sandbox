@@ -9,6 +9,19 @@ const DEFAULT_PRELOAD_PACKAGES = [
   'openpyxl'
 ];
 
+const LOCAL_WHEEL_PACKAGES = new Set([
+  'japanize-noto-sans-jp',
+  'openpyxl',
+  'python-docx',
+  'python-pptx',
+  'pypdf',
+  'reportlab',
+  'tabulate',
+  'xlsxwriter',
+  'et-xmlfile',
+  'defusedxml'
+]);
+
 let runtimeNetworkAllowed = null;
 
 function loadConfig(configFilePath) {
@@ -138,8 +151,30 @@ function setPreloadPackageEnabled(configFilePath, packageName, enabled) {
   return saveConfig(configFilePath, { preloadPackages: list });
 }
 
+/**
+ * プリロード対象パッケージを Pyodide 標準パッケージと独自 wheel に分離して取得
+ * @param {string} [configFilePath]
+ * @returns {{ pyodidePackages: string[], piplitePackages: string[] }}
+ */
+function getCategorizedPreloadPackages(configFilePath = null) {
+  const allPackages = getPreloadPackages(configFilePath);
+  const pyodidePackages = [];
+  const piplitePackages = [];
+
+  for (const pkg of allPackages) {
+    if (LOCAL_WHEEL_PACKAGES.has(pkg)) {
+      piplitePackages.push(pkg);
+    } else {
+      pyodidePackages.push(pkg);
+    }
+  }
+
+  return { pyodidePackages, piplitePackages };
+}
+
 module.exports = {
   DEFAULT_PRELOAD_PACKAGES,
+  LOCAL_WHEEL_PACKAGES,
   loadConfig,
   saveConfig,
   getResolvedDataDir,
@@ -148,7 +183,8 @@ module.exports = {
   resetRuntimeNetworkAllowed,
   getPreloadPackages,
   isPreloadPackageEnabled,
-  setPreloadPackageEnabled
+  setPreloadPackageEnabled,
+  getCategorizedPreloadPackages
 };
 
 

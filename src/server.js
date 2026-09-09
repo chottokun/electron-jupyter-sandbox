@@ -4,7 +4,7 @@ const fs = require('fs');
 const url = require('url');
 const { logger } = require('./logger');
 const { loadOverrides } = require('./settings');
-const { getPreloadPackages } = require('./config');
+const { getCategorizedPreloadPackages } = require('./config');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -106,7 +106,7 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
             baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
             const existingOverrides = baseContent['jupyter-config-data']['settingsOverrides'] || {};
 
-            const preloadList = getPreloadPackages(configFilePath);
+            const { pyodidePackages, piplitePackages } = getCategorizedPreloadPackages(configFilePath);
             const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
 
             const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || {};
@@ -116,8 +116,9 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
               ...existingKernelSettings,
               loadPyodideOptions: {
                 ...existingLoadPyodideOptions,
-                packages: preloadList
-              }
+                packages: pyodidePackages
+              },
+              piplitePreloadPackages: piplitePackages
             };
 
             baseContent['jupyter-config-data']['settingsOverrides'] = {
