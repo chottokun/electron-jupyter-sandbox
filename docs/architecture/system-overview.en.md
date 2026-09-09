@@ -2,8 +2,8 @@
 
 ---
 type: Architecture Overview
-title: 完全隔離型デスクトップJupyter環境 アーキテクチャ概要
-description: ElectronとWebAssembly (Pyodide) ベースのJupyterLiteによる完全隔離・完全オフライン実行環境のシステム全体設計。
+title: Fully Isolated Desktop Jupyter Environment Architecture Overview
+description: Overall system architecture for a fully isolated, fully offline Python execution environment using WebAssembly (Pyodide)-based JupyterLite wrapped in Electron.
 tags:
   - architecture
   - electron
@@ -16,21 +16,21 @@ generated:
   at: '2026-08-30T02:30:00Z'
 ---
 
-# システム全体設計とアーキテクチャ方針
+# Overall System Architecture & Design Principles
 
-本システムは、**WebAssembly (Pyodide)** ベースの **JupyterLite** を **Electron** でラップし、ローカルPCの環境を一切汚さない「完全隔離型・完全オフライン」のPython実行環境を提供するデスクトップアプリケーションです。
+This system is a desktop application that wraps **WebAssembly (Pyodide)**-based **JupyterLite** inside **Electron**, providing a completely isolated and fully offline Python execution environment that leaves zero footprint on the host OS.
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      Electron App                           │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ Main Process (Node.js)                                  │ │
-│ │  - 内部HTTPサーバー (http://127.0.0.1:<random_port>)     │ │
-│ │    ・COOP/COEP/CORP ヘッダー付与 (Wasm/Worker対応)      │ │
-│ │    ・正確な MIME-Type 配信 (.wasm, .whl, .mjs 等)        │ │
-│ │  - 外部ネットワーク物理遮断 (127.0.0.1 以外の通信を破棄)  │ │
-│ │  - OSファイルダイアログ (Open / Save IPC)               │ │
-│ │  - 統合ファイルロガー (app.log)                         │ │
+│ │  - Internal HTTP Server (http://127.0.0.1:<random_port>) │ │
+│ │    - COOP/COEP/CORP header injection (Wasm/Worker)      │ │
+│ │    - Accurate MIME-Type serving (.wasm, .whl, .mjs etc)  │ │
+│ │  - Physical External Network Blocking (drops non-local) │ │
+│ │  - OS File Dialogs (Open / Save IPC)                    │ │
+│ │  - Integrated File Logger (app.log)                     │ │
 │ └─────────────────────────┬───────────────────────────────┘ │
 │                           │ IPC (contextBridge)             │
 │ ┌─────────────────────────▼───────────────────────────────┐ │
@@ -38,28 +38,28 @@ generated:
 │ │  ┌────────────────────────────────────────────────────┐ │ │
 │ │  │ JupyterLite (JupyterLab UI)                        │ │ │
 │ │  │  ┌──────────────────────────────────────────────┐  │ │ │
-│ │  │  │ AI エラーコピー拡張機能 (JupyterLab Plugin)  │  │ │ │
-│ │  │  │  - セル実行エラーのシグナル監視               │  │ │ │
-│ │  │  │  - 🤖 AIエラーコピーボタンの動的マウント     │  │ │ │
+│ │  │  │ AI Error Copy Extension (JupyterLab Plugin)   │  │ │ │
+│ │  │  │  - Cell execution error signal monitoring     │  │ │ │
+│ │  │  │  - 🤖 Dynamic AI error copy button mount      │  │ │ │
 │ │  │  └──────────────────────────────────────────────┘  │ │ │
 │ │  │  ┌──────────────────────────────────────────────┐  │ │ │
 │ │  │  │ Pyodide / WebAssembly Worker                 │  │ │ │
-│ │  │  │  - 完全隔離されたPython実行環境 (NumPy等)     │  │ │ │
-│ │  │  │  - 仮想ファイルシステム (IndexedDB)          │  │ │ │
+│ │  │  │  - Fully isolated Python environment (NumPy)  │  │ │ │
+│ │  │  │  - Virtual Filesystem (IndexedDB)            │  │ │ │
 │ │  │  └──────────────────────────────────────────────┘  │ │ │
 │ │  └────────────────────────────────────────────────────┘ │ │
 │ └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## セキュリティ設計方針
+## Security Design Principles
 
-1. **完全オフライン・ネットワーク遮断**
-   - Electron の `webRequest.onBeforeRequest` により、`127.0.0.1` 以外の外部インターネットアクセスを物理的に破棄。
-   - 機密データを含むノートブックや誤ったスクリプト実行時にも外部漏洩リスクはゼロ。
+1. **Guaranteed Fully Offline / Network Isolation**
+   - Electron's `webRequest.onBeforeRequest` physically drops all external internet access attempt outside `127.0.0.1`.
+   - Zero risk of external data leakage even when handling confidential notebook data or executing erroneous scripts.
 
-2. **OS保護とサンドボックス**
-   - Pythonコードはブラウザ内の WebAssembly (Pyodide) 上で実行されるため、OSのファイルシステム破壊やシステム改ざんのリスクはありません。
+2. **OS Protection & Sandboxing**
+   - Python code executes strictly within WebAssembly (Pyodide) inside the browser sandbox, ensuring zero risk of host OS filesystem destruction or unauthorized system modification.
 
-3. **内部HTTPサーバー配信**
-   - Node.js 標準の軽量 HTTP サーバーを `127.0.0.1` の空きポートで起動し、Pyodide の `micropip` および WebSocket が期待する標準 HTTP/WS スキームを提供します。
+3. **Internal HTTP Server Delivery**
+   - A standard Node.js lightweight HTTP server listens on a random free port on `127.0.0.1`, serving Pyodide's `micropip` and standard HTTP/WS schemes expected by JupyterLite.

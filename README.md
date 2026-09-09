@@ -1,3 +1,5 @@
+[English](README.en.md) | [日本語](README.md)
+
 # Electron Jupyter Sandbox (完全隔離型・AI連携デスクトップJupyter環境)
 
 WebAssembly (Pyodide) ベースの **JupyterLite** を **Electron** でラップし、ローカルPCの環境を一切汚さない「完全隔離型・完全オフライン」のPython実行環境を提供するデスクトップアプリケーションです。
@@ -75,7 +77,7 @@ Get-FileHash .\electron-jupyter-sandbox-setup.exe -Algorithm SHA256
 
 本プロジェクトの技術ドキュメントは、**Open Knowledge Format (OKF) v0.2** に準拠して体系化されています：
 
-- 📖 **[ナレッジベース目次 (`docs/index.md`)](docs/index.md)**
+- 📖 **[ナレッジベース目次 (`docs/README.md`)](docs/README.md)**
 - 🏛️ **アーキテクチャ (`docs/architecture/`)**
   - [システムアーキテクチャ概要 (`docs/architecture/system-overview.md`)](docs/architecture/system-overview.md)
   - [バージョン整合性マトリクス (`docs/architecture/version-matrix.md`)](docs/architecture/version-matrix.md)
