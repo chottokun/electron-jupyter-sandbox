@@ -44,6 +44,12 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: Run wheel tests (pytest)
+        run: npm run test:wheels
+
+      - name: Verify wheel integrity
+        run: npm run wheels:verify
+
       - name: Verify build artifacts
         run: |
           test -f jupyterlite/index.html || (echo "Missing jupyterlite/index.html" && exit 1)

@@ -1,0 +1,82 @@
+{
+  "generatedAt": "2026-09-09T02:38:38.095890+00:00",
+  "pyodideLockPath": "jupyterlite/static/pyodide/pyodide-lock.json",
+  "packages": {
+    "defusedxml": {
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "filename": "defusedxml-0.7.1-py2.py3-none-any.whl",
+      "sha256": "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61",
+      "dependencies": []
+    },
+    "et-xmlfile": {
+      "name": "et-xmlfile",
+      "version": "2.0.0",
+      "filename": "et_xmlfile-2.0.0-py3-none-any.whl",
+      "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
+      "dependencies": []
+    },
+    "openpyxl": {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "filename": "openpyxl-3.1.5-py2.py3-none-any.whl",
+      "sha256": "5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2",
+      "dependencies": [
+        "et-xmlfile"
+      ]
+    },
+    "pypdf": {
+      "name": "pypdf",
+      "version": "6.18.0",
+      "filename": "pypdf-6.18.0-py3-none-any.whl",
+      "sha256": "05b762b77bcb9dcb4a7c91fcf5dded585b25bee7269ab3d3001d7c55fa1b324b",
+      "dependencies": []
+    },
+    "python-docx": {
+      "name": "python-docx",
+      "version": "1.2.0",
+      "filename": "python_docx-1.2.0-py3-none-any.whl",
+      "sha256": "3fd478f3250fbbbfd3b94fe1e985955737c145627498896a8a6bf81f4baf66c7",
+      "dependencies": [
+        "lxml",
+        "typing-extensions"
+      ]
+    },
+    "python-pptx": {
+      "name": "python-pptx",
+      "version": "1.0.2",
+      "filename": "python_pptx-1.0.2-py3-none-any.whl",
+      "sha256": "160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba",
+      "dependencies": [
+        "pillow",
+        "xlsxwriter",
+        "lxml",
+        "typing-extensions"
+      ]
+    },
+    "reportlab": {
+      "name": "reportlab",
+      "version": "5.0.1",
+      "filename": "reportlab-5.0.1-py3-none-any.whl",
+      "sha256": "1c36e6bb0e71780c72331eba60da7f602e8d4389a8723825af71342e49d791e8",
+      "dependencies": [
+        "pillow",
+        "charset-normalizer"
+      ]
+    },
+    "tabulate": {
+      "name": "tabulate",
+      "version": "0.10.0",
+      "filename": "tabulate-0.10.0-py3-none-any.whl",
+      "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+      "dependencies": []
+    },
+    "xlsxwriter": {
+      "name": "xlsxwriter",
+      "version": "3.2.9",
+      "filename": "xlsxwriter-3.2.9-py3-none-any.whl",
+      "sha256": "9a5db42bc5dff014806c58a20b9eae7322a134abb6fce3c92c181bfb275ec5b3",
+      "dependencies": []
+    }
+  }
+}

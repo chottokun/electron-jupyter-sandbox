@@ -21,7 +21,12 @@
     "package:win": "npm run set-policy:strict && electron-builder --win --x64 --publish never",
     "package:win:configurable": "npm run set-policy:configurable && electron-builder --win --x64 --publish never",
     "package:mac": "npm run set-policy:strict && electron-builder --mac --publish never",
-    "package:linux": "npm run set-policy:strict && electron-builder --linux AppImage --publish never"
+    "package:linux": "npm run set-policy:strict && electron-builder --linux AppImage --publish never",
+    "wheels:add": "uv run python scripts/add_wheels.py",
+    "wheels:preset:office": "uv run python scripts/add_wheels.py --preset office",
+    "wheels:verify": "uv run python scripts/verify_wheels.py",
+    "wheels:audit": "uv run python scripts/add_wheels.py --audit",
+    "test:wheels": "uv run pytest tests/test_wheels.py -v"
   },
 
 
