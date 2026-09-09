@@ -15,50 +15,150 @@ generated:
 
 # Pyodide Wasm カーネルとローカル配信基盤
 
-本コンポーネントは、ブラウザサンドボックス内で安全に Python コードを実行するための Pyodide WebAssembly ランタイムおよび内部配信サーバーです。
+本サンドボックス環境は、ブラウザ内の WebAssembly (Pyodide `314.0.5`) 上で完全にローカル完結する Python 実行環境を提供します。
+外部ネットワークへのアクセスなしで、データサイエンスからオフィスドキュメント操作（Excel, Word, PowerPoint, PDF）まで幅広いタスクを安全に実行できます。
 
-## 主要仕様
+---
+
+## 1. ユーザーが利用できるライブラリ体系
+
+ライブラリの利用方法は、**「そのまま `import` できるもの」** と **「`piplite.install()` でロードするもの」** の 2 つに分かれます。どちらもオフライン（ローカル内包）で完結し、インターネット接続は不要です。
+
+```mermaid
+graph TD
+    A["Python ノートブック実行環境"] --> B["即時インポート可能<br/>（標準ライブラリ & Pyodide 同梱）"]
+    A --> C["piplite でオンデマンド読込<br/>（オフィス・ユーティリティ系 wheel）"]
+    B --> D["NumPy, Pandas, Matplotlib, SciPy, Scikit-learn 等"]
+    C --> E["openpyxl, python-docx, python-pptx, pypdf, reportlab 等"]
+```
+
+| 区分 | 呼び出し方法 | 主な対象ライブラリ |
+| :--- | :--- | :--- |
+| **即時インポート可能** | `import pandas as pd`<br/>（追加コード不要） | Python 標準ライブラリ全般、NumPy, Pandas, Matplotlib, SciPy, Scikit-learn, Seaborn, Pillow, lxml 等 |
+| **オンデマンド読込** | `import piplite`<br/>`await piplite.install(['openpyxl'])`<br/>（セルの先頭で1回実行） | openpyxl, xlsxwriter, python-docx, python-pptx, pypdf, reportlab, tabulate 等 |
+
+---
+
+## 2. 目的別・使えるライブラリ逆引き一覧
+
+ユーザーのユースケース（やりたいこと）ごとに利用可能なパッケージの一覧です。
+
+### 📊 データ分析・数値計算・統計
+| パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
+| :--- | :--- | :--- | :--- |
+| **`pandas`** | そのまま `import` | 表形式データの集計、CSV/Excel読み書き、時系列解析 | `import pandas as pd` |
+| **`numpy`** | そのまま `import` | 多次元配列演算、線形代数、乱数生成、高速計算 | `import numpy as np` |
+| **`scipy`** | そのまま `import` | 科学技術計算、最適化、積分、信号処理、統計検定 | `import scipy` |
+| **`statsmodels`** | そのまま `import` | 統計モデルの推定、時系列分析、仮説検定 | `import statsmodels.api as sm` |
+| **`sympy`** | そのまま `import` | 記号代数、方程式の解析解、微積分計算 | `import sympy as sp` |
+
+### 📈 グラフ・可視化
+| パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
+| :--- | :--- | :--- | :--- |
+| **`matplotlib`** | そのまま `import` | 2D/3D グラフ描画（折れ線、散布図、ヒストグラム等） | `import matplotlib.pyplot as plt` |
+| **`seaborn`** | そのまま `import` | 統計データの美しいグラフィック可視化、ヒートマップ | `import seaborn as sns` |
+| **`bokeh`** | そのまま `import` | インタラクティブな Web チャート生成 | `import bokeh` |
+| **`altair`** | そのまま `import` | 宣言的な統計ビジュアライゼーション | `import altair as alt` |
+
+### 📑 オフィスドキュメント操作（Excel・Word・PowerPoint・PDF）
+| パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
+| :--- | :--- | :--- | :--- |
+| **`openpyxl`** | `piplite.install` | Excel (`.xlsx`) の読み込み・編集・数式設定・セル書式設定 | `import openpyxl` |
+| **`xlsxwriter`** | `piplite.install` | Excel (`.xlsx`) の高速新規作成、グラフ・条件付き書式 | `import xlsxwriter` |
+| **`python-docx`** | `piplite.install` | Word (`.docx`) の新規作成、段落・表・画像の挿入と書式設定 | `import docx` |
+| **`python-pptx`** | `piplite.install` | PowerPoint (`.pptx`) スライドの自動作成・レイアウト編集 | `import pptx` |
+| **`pypdf`** | `piplite.install` | 既存 PDF のページ抽出・結合・回転・暗号化・テキスト取得 | `import pypdf` |
+| **`reportlab`** | `piplite.install` | PDF 帳票・図形・テキストの直接描画・レポート出力 | `from reportlab.pdfgen import canvas` |
+
+### 🤖 機械学習・画像処理・ユーティリティ
+| パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
+| :--- | :--- | :--- | :--- |
+| **`scikit-learn`** | そのまま `import` | 機械学習（分類、回帰、クラスタリング、次元削減） | `from sklearn.linear_model import LogisticRegression` |
+| **`pillow`** | そのまま `import` | 画像の読み込み、リサイズ、トリミング、フィルタ処理 | `from PIL import Image` |
+| **`tabulate`** | `piplite.install` | リストや辞書のデータをきれいなテキスト/Markdown表に変換 | `from tabulate import tabulate` |
+| **`defusedxml`** | `piplite.install` | XML 爆弾等の攻撃を防ぎ安全に XML データを処理 | `import defusedxml.ElementTree as ET` |
+| **`lxml`** / **`beautifulsoup4`** | そのまま `import` | HTML/XML ドキュメントの解析・パース | `from bs4 import BeautifulSoup` |
+
+---
+
+## 3. クイックスタート・利用コード例
+
+### 例1: データ分析とグラフ作成（即座に実行可能）
+```python
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# データの作成
+np.random.seed(42)
+df = pd.DataFrame({
+    '月': [f'{i}月' for i in range(1, 13)],
+    '売上': np.random.randint(100, 300, size=12)
+})
+
+# グラフ描画
+plt.figure(figsize=(8, 4))
+plt.bar(df['月'], df['売上'], color='steelblue')
+plt.title('月別売上推移')
+plt.ylabel('売上 (万円)')
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.show()
+```
+
+### 例2: Excel ワークブックの作成（openpyxl）
+```python
+import piplite
+await piplite.install(['openpyxl'])
+
+import openpyxl
+
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "売上集計"
+
+ws['A1'] = "項目"
+ws['B1'] = "金額"
+ws['A2'] = "ハードウェア"
+ws['B2'] = 150000
+ws['A3'] = "ソフトウェア"
+ws['B3'] = 80000
+
+wb.save("sample_sales.xlsx")
+print("sample_sales.xlsx を保存しました")
+```
+
+### 例3: PDF レポートの自動生成（ReportLab）
+```python
+import piplite
+await piplite.install(['reportlab'])
+
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+c = canvas.Canvas("report.pdf", pagesize=letter)
+c.setFont("Helvetica-Bold", 16)
+c.drawString(72, 720, "Offline Pyodide Report")
+c.setFont("Helvetica", 12)
+c.drawString(72, 690, "Generated completely offline inside JupyterLite.")
+c.save()
+print("report.pdf を生成しました")
+```
+
+---
+
+## 4. アーキテクチャと配信仕様（技術的詳細）
+
+本環境が完全オフラインで動作するための内部配信設計です。
 
 1. **完全ローカル同梱 (`jupyterlite/static/pyodide/` & `wheels/`)**
-   - Pyodide `314.0.5` の Wasm バイナリ、標準ライブラリ、各種データサイエンス系 wheel パッケージ（NumPy, Pandas, SciPy, Matplotlib 等）をローカルに内包。
-   - 追加のオフィス・ドキュメント系 wheel パッケージ（Excel, Word, PowerPoint, PDF 等）を `wheels/` に同梱し、`piplite` 経由でオフライン利用可能。
-   - 外部 CDN へのリクエストは一切行いません。
-
-2. **内部 HTTP サーバー (`http://127.0.0.1:<port>`)**
-   - Node.js 標準の `http` モジュールで起動。
-   - `Cross-Origin-Opener-Policy: same-origin` および `Cross-Origin-Embedder-Policy: require-corp` を付与し、`SharedArrayBuffer` の利用を保証。
-
+   - Pyodide `314.0.5` ランタイム、Wasm バイナリ、標準ライブラリ、および Pure Python wheel をすべてローカルに内包。
+   - 外部 CDN（jsdelivr や PyPI 等）へのネットワークリクエストは行いません。
+2. **内部 HTTP 配信サーバー (`http://127.0.0.1:<port>`)**
+   - Node.js の内部サーバー経由でセキュアに配信。
+   - `Cross-Origin-Opener-Policy: same-origin` および `Cross-Origin-Embedder-Policy: require-corp` を付与し、`SharedArrayBuffer` による高速実行を担保。
 3. **MIME タイプの完全サポート**
-   - `.wasm` (`application/wasm`)、`.whl` (`application/x-wheel+zip`)、`.mjs` (`application/javascript`) などの正確な配信を担保。
+   - `.wasm` (`application/wasm`)、`.whl` (`application/x-wheel+zip`)、`.mjs` (`application/javascript`) を正しく配信。
 
-## 同梱・組み込みパッケージ一覧
+> 詳細なパッケージ一覧やハッシュ・ライセンス情報については [同梱 Python パッケージ一覧・ライセンスリファレンス](../references/bundled-packages.md) を参照してください。
 
-完全オフライン環境で即座にインポートまたは `piplite.install()` 可能なパッケージ一覧です。
-
-### 1. オフィス・ドキュメント操作系 Wheel (`wheels/`)
-事前ダウンロードされ、`jupyterlite/pypi/` に内包されているパッケージ群です。
-
-| パッケージ名 | バージョン | 主な用途 | 依存パッケージ (Pyodide同梱 / wheels) | ライセンス |
-| :--- | :--- | :--- | :--- | :--- |
-| `openpyxl` | 3.1.5 | Excel (`.xlsx`) 読み書き・スタイル設定 | `et-xmlfile` | MIT |
-| `et-xmlfile` | 2.0.0 | openpyxl 用 XML 生成ヘルパー | なし | MIT |
-| `xlsxwriter` | 3.2.9 | 高速 Excel (`.xlsx`) 生成・グラフ作成 | なし | BSD-2-Clause |
-| `python-docx` | 1.2.0 | Word (`.docx`) 読み書き・生成 | `lxml`, `typing-extensions` | MIT |
-| `python-pptx` | 1.0.2 | PowerPoint (`.pptx`) スライド自動生成 | `pillow`, `xlsxwriter`, `lxml`, `typing-extensions` | MIT |
-| `pypdf` | 6.18.0 | PDF 抽出・結合・暗号化・メタデータ操作 | なし | BSD-3-Clause |
-| `reportlab` | 5.0.1 | PDF レポート・ドキュメント描画生成 | `pillow`, `charset-normalizer` | BSD-3-Clause |
-| `tabulate` | 0.10.0 | テキスト/Markdown 表形式データ整形出力 | なし | MIT |
-| `defusedxml` | 0.7.1 | XML 脆弱性対策・安全なパーサー | なし | Python-2.0 |
-
-> [!NOTE]
-> これらはノートブック上で `import piplite; await piplite.install(['openpyxl', 'python-docx'])` などの形でオフラインインストールして利用します。
-
-### 2. Pyodide 標準同梱データサイエンスパッケージ (`jupyterlite/static/pyodide/`)
-Pyodide ランタイム自身に Wasm/C 拡張コンパイル済みとして同梱されている主要パッケージ群です。
-
-- **科学計算 / 数値解析**: `numpy`, `scipy`, `sympy`, `mpmath`
-- **データ分析 / 処理**: `pandas`, `pyarrow`, `polars` (micro)
-- **可視化 / グラフ**: `matplotlib`, `seaborn`, `bokeh`, `altair`
-- **機械学習 / 統計**: `scikit-learn`, `statsmodels`
-- **パーサー / ユーティリティ**: `lxml`, `pillow`, `beautifulsoup4`, `regex`, `typing-extensions`, `charset-normalizer`
 
