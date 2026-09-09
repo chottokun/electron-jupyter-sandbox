@@ -41,20 +41,71 @@ PYODIDE_LOCK_PATH = PROJECT_ROOT / "jupyterlite" / "static" / "pyodide" / "pyodi
 # プリセット定義
 PRESETS = {
     "office": [
-        "openpyxl",           # Excel読み書き (.xlsx)
-        "xlsxwriter",         # Excel書き込み (.xlsx)
-        "python-docx",        # Word読み書き (.docx)
-        "python-pptx",        # PowerPoint読み書き (.pptx)
-        "pypdf",              # PDF読み書き
-        "tabulate",           # テーブル整形出力
-        "reportlab",          # PDF生成
-        "defusedxml",         # セキュアXML解析
-        "matplotlib-fontja",  # Matplotlib 日本語フォント（IPAexゴシック）
+        "openpyxl",               # Excel読み書き (.xlsx)
+        "xlsxwriter",             # Excel書き込み (.xlsx)
+        "python-docx",            # Word読み書き (.docx)
+        "python-pptx",            # PowerPoint読み書き (.pptx)
+        "pypdf",                  # PDF読み書き
+        "tabulate",               # テーブル整形出力
+        "reportlab",              # PDF生成
+        "defusedxml",             # セキュアXML解析
+        "japanize-noto-sans-jp",  # 超軽量 Google Noto Sans JP サブセットフォント（SVG対応）
     ],
     "japanese": [
-        "matplotlib-fontja",  # Matplotlib 日本語フォント（IPAexゴシック）
+        "japanize-noto-sans-jp",  # 超軽量 Google Noto Sans JP サブセットフォント（SVG対応）
     ],
 }
+
+
+def find_local_wheel(pkg_name: str) -> Path | None:
+    """wheels/ 配下からローカルビルド済み wheel を検索"""
+    norm = normalize_name(pkg_name).replace("-", "_")
+    for f in WHEELS_DIR.glob("*.whl"):
+        parts = f.name.split("-")
+        if len(parts) >= 2:
+            f_norm = normalize_name(parts[0]).replace("-", "_")
+            if f_norm == norm:
+                return f
+    return None
+
+
+def read_local_wheel_info(wheel_path: Path) -> dict | None:
+    """ローカル wheel ファイルからメタデータとハッシュを取得"""
+    import zipfile
+    try:
+        data = wheel_path.read_bytes()
+        sha256 = hashlib.sha256(data).hexdigest()
+        with zipfile.ZipFile(wheel_path) as z:
+            # .dist-info/METADATA を検索
+            metadata_files = [n for n in z.namelist() if n.endswith(".dist-info/METADATA")]
+            if not metadata_files:
+                return None
+            meta_text = z.read(metadata_files[0]).decode("utf-8")
+
+        name = wheel_path.name.split("-")[0]
+        version = wheel_path.name.split("-")[1]
+        deps = []
+        for line in meta_text.splitlines():
+            if line.startswith("Name:"):
+                name = line.split(":", 1)[1].strip()
+            elif line.startswith("Version:"):
+                version = line.split(":", 1)[1].strip()
+            elif line.startswith("Requires-Dist:"):
+                dep_spec = line.split(":", 1)[1].strip()
+                deps.extend(parse_requires_dist([dep_spec]))
+
+        return {
+            "name": name,
+            "version": version,
+            "filename": wheel_path.name,
+            "url": "",
+            "sha256": sha256,
+            "dependencies": deps,
+            "is_local": True,
+        }
+    except Exception as e:
+        print(f"⚠️  ローカル wheel 読み込み失敗 ({wheel_path.name}): {e}")
+        return None
 
 
 def get_pyodide_packages() -> set[str]:
@@ -179,6 +230,25 @@ def resolve_dependencies(
             continue
 
         indent = "  " * depth
+
+        # ローカル wheel の確認（japanize-noto-sans-jp 等の独自ビルド品）
+        local_whl = find_local_wheel(pkg)
+        if local_whl:
+            local_info = read_local_wheel_info(local_whl)
+            if local_info:
+                print(f"{indent}📦 {pkg} {local_info['version']} → ローカル wheel を検出 ({local_whl.name})")
+                resolved[norm_name] = local_info
+                # 依存関係の再帰解決
+                if local_info["dependencies"]:
+                    resolve_dependencies(
+                        local_info["dependencies"],
+                        pyodide_pkgs,
+                        resolved=resolved,
+                        depth=depth + 1,
+                        dry_run=dry_run,
+                    )
+                continue
+
         print(f"{indent}🔍 {pkg} のメタデータを取得中...")
 
         metadata = fetch_pypi_metadata(pkg)
@@ -230,6 +300,10 @@ def download_wheel(url: str, filename: str, expected_sha256: str) -> bool:
             return True
         else:
             print(f"  ⚠️  {filename} → ハッシュ不一致、再ダウンロード")
+
+    if not url:
+        print(f"  ❌ {filename}: ダウンロード URL がありません")
+        return False
 
     req = urllib.request.Request(url, headers={"User-Agent": "electron-jupyter-sandbox/1.0"})
     try:
@@ -291,26 +365,11 @@ def run_audit() -> int:
         return 0
 
     print("\n🔒 pip-audit による脆弱性チェック...")
-    print(f"   対象: {len(wheel_files)} パッケージ\n")
-
-    # マニフェストからパッケージ名とバージョンを取得
-    if not MANIFEST_PATH.exists():
-        print("❌ manifest.json がありません。先に add_wheels.py でダウンロードしてください")
-        return 1
-
-    with open(MANIFEST_PATH, encoding="utf-8") as f:
-        manifest = json.load(f)
-
-    # pip-audit に渡す requirements 形式を一時作成
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, prefix="wheels-audit-") as tmp:
-        for pkg_info in manifest.get("packages", {}).values():
-            tmp.write(f"{pkg_info['name']}=={pkg_info['version']}\n")
-        tmp_path = tmp.name
+    print(f"   対象: {len(wheel_files)} パッケージ (wheels/)\n")
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip_audit", "--requirement", tmp_path, "--desc"],
+            [sys.executable, "-m", "pip_audit", "--path", str(WHEELS_DIR), "--desc"],
             capture_output=True,
             text=True,
         )
@@ -328,8 +387,6 @@ def run_audit() -> int:
         print("❌ pip-audit がインストールされていません")
         print("   インストール: uv add --dev pip-audit")
         return 1
-    finally:
-        os.unlink(tmp_path)
 
 
 def clean_wheels() -> None:

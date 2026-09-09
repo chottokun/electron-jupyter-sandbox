@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T04:48:20.380784+00:00",
+  "generatedAt": "2026-09-09T04:55:55.369090+00:00",
   "pyodideLockPath": "jupyterlite/static/pyodide/pyodide-lock.json",
   "packages": {
     "defusedxml": {
@@ -10,21 +10,22 @@
       "dependencies": []
     },
     "et-xmlfile": {
-      "name": "et-xmlfile",
+      "name": "et_xmlfile",
       "version": "2.0.0",
       "filename": "et_xmlfile-2.0.0-py3-none-any.whl",
       "sha256": "7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa",
       "dependencies": []
     },
-    "matplotlib-fontja": {
-      "name": "matplotlib-fontja",
-      "version": "1.1.0",
-      "filename": "matplotlib_fontja-1.1.0-py2.py3-none-any.whl",
-      "sha256": "930603aaffd420ad89a6cf3399f074b14e939e8e349843ed1cb558ac97c8c94a",
+    "japanize-noto-sans-jp": {
+      "name": "japanize-noto-sans-jp",
+      "version": "1.0.0",
+      "filename": "japanize_noto_sans_jp-1.0.0-py3-none-any.whl",
+      "sha256": "dd4a6690809d33f1067aca85212d8fcbf30b64fe2beffc45577039596d0e4b70",
       "dependencies": [
         "matplotlib"
       ]
     },
+
     "openpyxl": {
       "name": "openpyxl",
       "version": "3.1.5",

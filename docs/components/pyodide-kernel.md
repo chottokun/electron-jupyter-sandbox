@@ -56,15 +56,16 @@ graph TD
 | パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
 | :--- | :--- | :--- | :--- |
 | **`matplotlib`** | そのまま `import` | 2D/3D グラフ描画（折れ線、散布図、ヒストグラム等） | `import matplotlib.pyplot as plt` |
-| **`matplotlib-fontja`** | `piplite.install` | **Matplotlibの日本語豆腐（文字化け）解消**。IPAexゴシックを自動適用 | `import matplotlib_fontja` |
+| **`japanize-noto-sans-jp`** | `piplite.install` | **Matplotlibの日本語豆腐解消**。Google Noto Sans JP（JIS第1水準サブセット・760KB）を自動適用＆SVGネイティブ描画設定 | `import japanize_noto_sans_jp` |
 | **`seaborn`** | そのまま `import` | 統計データの美しいグラフィック可視化、ヒートマップ | `import seaborn as sns` |
 | **`bokeh`** | そのまま `import` | インタラクティブな Web チャート生成 | `import bokeh` |
 | **`altair`** | そのまま `import` | 宣言的な統計ビジュアライゼーション | `import altair as alt` |
 
 > [!TIP]
-> **Matplotlib の日本語豆腐（文字化け）について**:
-> Pyodide のデフォルト環境には欧文フォント（DejaVu Sans）のみが含まれているため、そのまま日本語を描画すると豆腐（□）になります。
-> 同梱されている **`matplotlib-fontja`** を `await piplite.install(['matplotlib-fontja'])` して `import matplotlib_fontja` を1行追加するだけで、IPAexゴシックフォントが自動設定され、すべてのグラフで日本語が綺麗に表示されます（外部通信不要・完全オフライン）。
+> **Matplotlib の日本語描画と SVG アーキテクチャ**:
+> - Pyodide のデフォルト環境には欧文フォントのみが含まれるため、そのまま日本語を描画すると豆腐（□）になります。
+> - 同梱の **`japanize-noto-sans-jp`** は、Google Fonts の標準フォント **Noto Sans JP** を JIS第1水準＋常用漢字（約3,500字）に厳選サブセット化した**わずか 760 KB の超軽量 wheel** です（IPAex等と比べ約 80% 軽量）。
+> - インポート時に `svg.fonttype = 'none'` が自動設定されるため、SVG 描画時は文字をパス化せず、**Electron / ブラウザネイティブの美麗なフォントレンダラーに描画が委ねられます**。これにより Retina / 4K ディスプレイでも極めて美しく、拡大してもボケないベクターグラフが得られます。
 
 ### 📑 オフィスドキュメント操作（Excel・Word・PowerPoint・PDF）
 | パッケージ名 | 読込方法 | できること・用途 | 代表的な使い方 |
@@ -89,26 +90,29 @@ graph TD
 
 ## 3. クイックスタート・利用コード例
 
-### 例1: データ分析とグラフ作成（日本語フォント対応）
+### 例1: データ分析とグラフ作成（超軽量 Noto Sans JP + SVG ネイティブ描画）
 ```python
-# 1. 日本語フォントパッケージをオフラインインストール
+# 1. 超軽量 Google 日本語フォントパッケージをオフラインインストール
 import piplite
-await piplite.install(['matplotlib-fontja'])
+await piplite.install(['japanize-noto-sans-jp'])
 
-# 2. パッケージをインポート（import matplotlib_fontja で日本語が自動適用）
+# 2. グラフ表示をベクターSVG形式に設定（Electron側で超高精細・ネイティブ描画）
+%config InlineBackend.figure_format = 'svg'
+
+# 3. パッケージをインポート（import japanize_noto_sans_jp でフォントとSVG設定が自動適用）
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib_fontja
+import japanize_noto_sans_jp
 
-# 3. データの作成
+# 4. データの作成
 np.random.seed(42)
 df = pd.DataFrame({
     '月': [f'{i}月' for i in range(1, 13)],
     '売上': np.random.randint(100, 300, size=12)
 })
 
-# 4. グラフ描画（日本語が豆腐にならず正常に表示されます）
+# 5. グラフ描画（日本語が豆腐にならず、Electronのネイティブフォントで鮮明に表示されます）
 plt.figure(figsize=(8, 4))
 plt.bar(df['月'], df['売上'], color='steelblue')
 plt.title('月別売上推移')

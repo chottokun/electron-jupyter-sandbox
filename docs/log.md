@@ -3,7 +3,8 @@
 ## 2026-09-09
 * Added automated wheel management scripts (`scripts/add_wheels.py`, `scripts/verify_wheels.py`), pytest suite, and CI verification step (by agent:antigravity)
 * Bundled office suite Python packages (`openpyxl`, `xlsxwriter`, `python-docx`, `python-pptx`, `pypdf`, `reportlab`, etc.) into `wheels/` and `jupyterlite/pypi/` (by agent:antigravity)
-* Documented bundled package specifications in [pyodide-kernel.md](./components/pyodide-kernel.md) and added [bundled-packages.md](./references/bundled-packages.md) (by agent:antigravity)
+* Generated ultra-lightweight Google Noto Sans JP subset wheel (`japanize-noto-sans-jp`, 760KB) and configured native SVG text rendering architecture (by agent:antigravity)
+* Documented bundled package specifications in [pyodide-kernel.md](./components/pyodide-kernel.md), [bundled-packages.md](./references/bundled-packages.md), and added [japanese-data-visualization.md](./playbooks/japanese-data-visualization.md) recipes playbook (by agent:antigravity)
 
 ## 2026-09-02
 * Added `security-network-policy.md` architecture document covering static build policy, runtime multi-tier defense, COEP credentialless, and dynamic CSP for Pyodide external requests (by agent:antigravity)
