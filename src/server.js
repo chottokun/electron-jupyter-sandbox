@@ -33,6 +33,11 @@ function resolveSafePath(rootDir, relativePath) {
     rel = '/lab/index.html';
   }
 
+  // JupyterLab が /lab/ 配下から ./pypi/ を相対要求した場合へのルーティング対応
+  if (rel.startsWith('/lab/pypi/')) {
+    rel = rel.replace('/lab/pypi/', '/pypi/');
+  }
+
   const normalizedRel = path.normalize(rel).replace(/^(\.\.[\/\\])+/, '');
   const filePath = path.resolve(rootDir, '.' + (normalizedRel.startsWith('/') ? normalizedRel : '/' + normalizedRel));
   const relFromRoot = path.relative(rootDir, filePath);

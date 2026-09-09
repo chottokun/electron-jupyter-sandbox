@@ -24,5 +24,10 @@ test('path traversal check resolves safe paths inside rootDir and blocks outside
   const relFromRoot = path.relative(subDir, outsidePath);
   assert.strictEqual(relFromRoot.startsWith('..'), true);
 
+  const pypiDir = path.join(subDir, 'pypi');
+  fs.mkdirSync(pypiDir, { recursive: true });
+  const wheelPath = resolveSafePath(subDir, '/lab/pypi/pkg.whl');
+  assert.strictEqual(wheelPath, path.join(pypiDir, 'pkg.whl'));
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
