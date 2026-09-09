@@ -105,11 +105,12 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
 
             baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
             const existingOverrides = baseContent['jupyter-config-data']['settingsOverrides'] || {};
+            const existingLitePluginSettings = baseContent['jupyter-config-data']['litePluginSettings'] || {};
 
             const { pyodidePackages, piplitePackages } = getCategorizedPreloadPackages(configFilePath);
             const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
 
-            const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || {};
+            const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || existingLitePluginSettings[kernelPluginId] || {};
             const existingLoadPyodideOptions = existingKernelSettings.loadPyodideOptions || {};
 
             const mergedKernelSettings = {
@@ -124,6 +125,11 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
             baseContent['jupyter-config-data']['settingsOverrides'] = {
               ...existingOverrides,
               ...userOverrides,
+              [kernelPluginId]: mergedKernelSettings
+            };
+
+            baseContent['jupyter-config-data']['litePluginSettings'] = {
+              ...existingLitePluginSettings,
               [kernelPluginId]: mergedKernelSettings
             };
 

@@ -1,7 +1,14 @@
 {
-  "generatedAt": "2026-09-09T04:55:55.369090+00:00",
+  "generatedAt": "2026-09-09T12:36:27.354647+00:00",
   "pyodideLockPath": "jupyterlite/static/pyodide/pyodide-lock.json",
   "packages": {
+    "comm": {
+      "name": "comm",
+      "version": "0.2.3",
+      "filename": "comm-0.2.3-py3-none-any.whl",
+      "sha256": "c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417",
+      "dependencies": []
+    },
     "defusedxml": {
       "name": "defusedxml",
       "version": "0.7.1",
@@ -25,7 +32,6 @@
         "matplotlib"
       ]
     },
-
     "openpyxl": {
       "name": "openpyxl",
       "version": "3.1.5",
