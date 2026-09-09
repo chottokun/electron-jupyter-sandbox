@@ -1,6 +1,7 @@
 const { app, Menu, MenuItem, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { isNetworkConfigurable } = require('./policy');
 
 /**
  * electron-jupyter-sandbox アプリケーションメニュー構築モジュール
@@ -19,8 +20,11 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     getLogPath = () => '',
     getLogDir = () => '',
     handleImportFile = async () => {},
-    handleExportFile = async () => {}
+    handleExportFile = async () => {},
+    isExternalNetworkAllowed = () => false,
+    toggleExternalNetwork = async () => {}
   } = handlers;
+
 
   const template = [
     // macOS専用 アプリケーションメニュー
@@ -158,9 +162,71 @@ function createApplicationMenu(mainWindow, handlers = {}) {
               dialog.showErrorBox('エラー', `設定フォルダが存在しません: ${settingsDir}`);
             }
           }
-        }
+        },
+        { type: 'separator' },
+        ...(isNetworkConfigurable()
+          ? [
+              {
+                label: '外部ネットワーク接続を許可する',
+                type: 'checkbox',
+                checked: isExternalNetworkAllowed(),
+                click: async (menuItem) => {
+                  if (menuItem.checked) {
+                    const result = await dialog.showMessageBox(mainWindow, {
+                      type: 'warning',
+                      buttons: ['許可して有効化', 'キャンセル'],
+                      defaultId: 1,
+                      cancelId: 1,
+                      title: 'セキュリティ警告',
+                      message: '外部ネットワーク接続を許可しますか？',
+                      detail: '外部ネットワーク通信を有効化すると、インターネット上の外部サーバーへのアクセスが可能になりますが、完全隔離のセキュリティ保護が解除されます。'
+                    });
+
+                    if (result.response === 0) {
+                      await toggleExternalNetwork(true);
+                      const reloadChoice = await dialog.showMessageBox(mainWindow, {
+                        type: 'question',
+                        buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+                        defaultId: 0,
+                        cancelId: 1,
+                        title: '設定反映',
+                        message: '外部ネットワーク接続を許可しました。',
+                        detail: '新しいセキュリティ設定（CSPおよび通信許可）を完全に適用するため、ページを再読み込みすることを推奨します。今すぐ再読み込みしますか？'
+                      });
+                      if (reloadChoice.response === 0) {
+                        mainWindow.reload();
+                      }
+                    } else {
+                      menuItem.checked = false;
+                    }
+                  } else {
+                    await toggleExternalNetwork(false);
+                    const reloadChoice = await dialog.showMessageBox(mainWindow, {
+                      type: 'info',
+                      buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+                      defaultId: 0,
+                      cancelId: 1,
+                      title: '設定反映',
+                      message: '外部ネットワーク接続を遮断しました。',
+                      detail: '完全隔離状態へ戻すため、ページを再読み込みすることを推奨します。今すぐ再読み込みしますか？'
+                    });
+                    if (reloadChoice.response === 0) {
+                      mainWindow.reload();
+                    }
+                  }
+                }
+              }
+            ]
+
+          : [
+              {
+                label: '外部ネットワーク接続: 完全隔離 (変更不可)',
+                enabled: false
+              }
+            ])
       ]
     },
+
 
     // ヘルプ メニュー
     {

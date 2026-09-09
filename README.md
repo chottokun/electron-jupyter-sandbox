@@ -38,20 +38,23 @@ npm start
 # 事前アセットビルド (未実行の場合)
 npm run build
 
-# Linux 向け (AppImage)
-npm run package:linux
+# --- 1. 完全隔離版 (Strict / 外部通信変更不可・企業/エアギャップ向け) ---
+npm run package:win       # Windows 向け (インストーラー .exe / ポータブル .exe / zip)
+npm run package:linux     # Linux 向け (AppImage)
+npm run package:mac       # macOS 向け (dmg)
 
-# Windows 向け (インストーラー .exe / ポータブル .exe / zip)
-# ※ Linux 上で実行する場合は事前に sudo apt install -y wine が必要です
-npm run package:win
-
-# macOS 向け (dmg)
-npm run package:mac
+# --- 2. 設定可能版 (Configurable / メニューから通信ON/OFF可能・個人開発向け) ---
+npm run package:win:configurable
 ```
+
+> [!TIP]
+> **セキュリティポリシーの詳細設計**
+> 完全隔離モードと設定可能モードの多層防御アーキテクチャ、および Python からの外部通信コード例については [セキュリティ＆ネットワークポリシー設計書 (`docs/architecture/security-network-policy.md`)](docs/architecture/security-network-policy.md) をご覧ください。
 
 > [!TIP]
 > **GitHub Actions による自動ビルド（推奨）**
 > `v1.0.0` 等の Git タグをプッシュ（または `gh workflow run release.yml` を実行）すると、Windows 仮想マシン上でインストーラーおよびポータブル版が自動ビルドされ、[GitHub Releases](https://github.com/chottokun/electron-jupyter-sandbox/releases) に自動公開されます。
+
 
 ---
 

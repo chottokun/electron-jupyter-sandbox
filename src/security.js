@@ -1,5 +1,12 @@
 const { logger } = require('./logger');
 
+/**
+ * 内部URL（JupyterLiteアセット、ローカルホスト、内部プロトコル）か判定
+ * 
+ * @param {string} urlStr 
+ * @param {string} scheme 
+ * @returns {boolean}
+ */
 function isAllowedUrl(urlStr, scheme = 'jupyter') {
   try {
     const parsed = new URL(urlStr);
@@ -11,12 +18,38 @@ function isAllowedUrl(urlStr, scheme = 'jupyter') {
   }
 }
 
-function applyNetworkFilter(targetSession, logFunc = null) {
-  const logHandler = logFunc || ((cat, msg) => logger.log(cat, msg));
+/**
+ * セッションにネットワークアクセス制御フィルターを適用
+ * 
+ * @param {Object} targetSession - Electron session instance
+ * @param {Function|Object} logFuncOrOptions - ログ関数 または オプションオブジェクト
+ */
+function applyNetworkFilter(targetSession, logFuncOrOptions = null) {
+  let logHandler = (cat, msg) => logger.log(cat, msg);
+  let isNetworkAllowed = () => false;
+
+  if (typeof logFuncOrOptions === 'function') {
+    logHandler = logFuncOrOptions;
+  } else if (logFuncOrOptions && typeof logFuncOrOptions === 'object') {
+    if (typeof logFuncOrOptions.logFunc === 'function') {
+      logHandler = logFuncOrOptions.logFunc;
+    }
+    if (typeof logFuncOrOptions.isNetworkAllowed === 'function') {
+      isNetworkAllowed = logFuncOrOptions.isNetworkAllowed;
+    }
+  }
 
   targetSession.webRequest.onBeforeRequest((details, callback) => {
     try {
+      // 内部通信は常に無条件で許可
       if (isAllowedUrl(details.url)) {
+        callback({ cancel: false });
+        return;
+      }
+
+      // 外部通信の場合：ポリシーおよび設定が許可しているか判定
+      if (isNetworkAllowed()) {
+        logHandler('SECURITY ALLOWED', `外部通信を許可しました: ${details.url}`);
         callback({ cancel: false });
       } else {
         logHandler('SECURITY BLOCKED', `外部通信を遮断しました: ${details.url}`);
@@ -27,9 +60,73 @@ function applyNetworkFilter(targetSession, logFunc = null) {
       callback({ cancel: true });
     }
   });
+
+  // レスポンスヘッダー調整（CORS 緩和、CORP 付与、CSP 動的適用）
+  if (targetSession.webRequest.onHeadersReceived) {
+    targetSession.webRequest.onHeadersReceived((details, callback) => {
+      const responseHeaders = { ...(details.responseHeaders || {}) };
+
+      if (isNetworkAllowed()) {
+        const removeCaseInsensitive = (headers, targetKey) => {
+          const lower = targetKey.toLowerCase();
+          for (const k of Object.keys(headers)) {
+            if (k.toLowerCase() === lower) {
+              delete headers[k];
+            }
+          }
+        };
+
+        // 外部通信許可時: COEP環境下での外部リクエスト破棄を防ぐため CORP と CORS を付与
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Origin');
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Methods');
+        removeCaseInsensitive(responseHeaders, 'Access-Control-Allow-Headers');
+        removeCaseInsensitive(responseHeaders, 'Cross-Origin-Resource-Policy');
+
+        responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+        responseHeaders['Access-Control-Allow-Methods'] = ['GET, POST, PUT, DELETE, OPTIONS, HEAD'];
+        responseHeaders['Access-Control-Allow-Headers'] = ['*'];
+        responseHeaders['Cross-Origin-Resource-Policy'] = ['cross-origin'];
+
+        // CSP が存在する場合、connect-src / script-src / worker-src / img-src に * を追加して遮断を解除
+        for (const key of Object.keys(responseHeaders)) {
+          if (key.toLowerCase() === 'content-security-policy') {
+            responseHeaders[key] = responseHeaders[key].map(val => {
+              let updated = val;
+              if (updated.includes('connect-src')) {
+                updated = updated.replace(/connect-src [^;]+/, "connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; connect-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
+              if (updated.includes('script-src')) {
+                updated = updated.replace(/script-src [^;]+/, "script-src * 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; script-src * 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
+              if (updated.includes('worker-src')) {
+                updated = updated.replace(/worker-src [^;]+/, "worker-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*");
+              } else {
+                updated = updated + "; worker-src * 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+              }
+              if (updated.includes('img-src')) {
+                updated = updated.replace(/img-src [^;]+/, "img-src * 'self' data: blob:");
+              }
+              return updated;
+            });
+          }
+        }
+
+      }
+
+      callback({ responseHeaders });
+    });
+  }
+
 }
+
+
 
 module.exports = {
   isAllowedUrl,
   applyNetworkFilter
 };
+
