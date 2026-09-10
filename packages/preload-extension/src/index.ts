@@ -3,6 +3,7 @@ import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { PageConfig } from '@jupyterlab/coreutils';
 
 const executedSessionIds = new Set<string>();
+const MAX_SYNC_FILE_SIZE = 20 * 1024 * 1024; // 20MB 上限
 
 const preloadPlugin: JupyterFrontEndPlugin<void> = {
   id: 'electron-jupyter-sandbox:preload-extension',
@@ -77,7 +78,7 @@ async def _sandbox_auto_preload():
         except Exception as e:
             print(f"[Preload Warning] Piplite install failed: {e}")
 
-    # カレントディレクトリのデータファイルを MEMFS へ透過ロード
+    # カレントディレクトリのデータファイルを MEMFS へ透過ロード (20MB以下)
     try:
         dir_url = f"${baseUrl}api/contents/${parentDir}".rstrip("/")
         resp = await pyfetch(dir_url)
@@ -87,7 +88,8 @@ async def _sandbox_auto_preload():
                 for item in data.get("content", []):
                     if item.get("type") == "file":
                         fname = item.get("name")
-                        if fname and not fname.startswith("."):
+                        fsize = item.get("size") or 0
+                        if fname and not fname.startswith(".") and fsize <= ${MAX_SYNC_FILE_SIZE}:
                             f_url = f"{dir_url}/{fname}"
                             f_resp = await pyfetch(f_url)
                             if f_resp.status == 200:
