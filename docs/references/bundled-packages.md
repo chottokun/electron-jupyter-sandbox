@@ -44,6 +44,9 @@ generated:
 | **tabulate** | `0.10.0` | `tabulate-0.10.0-py3-none-any.whl` | `f0b0622e...` | なし | MIT | 2次元データ・テーブルの綺麗なテキスト/Markdown整形 |
 | **defusedxml** | `0.7.1` | `defusedxml-0.7.1-py2.py3-none-any.whl` | `a352e7e4...` | なし | Python-2.0 (PSF) | XML 爆弾・エンティティ展開等の脆弱性防御 |
 | **japanize-noto-sans-jp** | `1.0.0` | `japanize_noto_sans_jp-1.0.0-py3-none-any.whl` | `dd4a6690...` | `matplotlib`* | SIL OFL 1.1 | Google Noto Sans JP 超軽量サブセット（JIS第1水準・760KB）＆SVG描画自動設定 |
+| **seaborn** | `0.13.2` | `seaborn-0.13.2-py3-none-any.whl` | `c3a8b291...` | `numpy`*, `pandas`*, `matplotlib`* | BSD-3-Clause | 統計データ可視化、ヒートマップ、分布図描画 |
+| **markdown** | `3.10.3` | `markdown-3.10.3-py3-none-any.whl` | `9b360f09...` | なし | BSD-3-Clause | Markdown 記法の HTML / 構造化テキストパース |
+| **piexif** | `1.1.3` | `piexif-1.1.3-py2.py3-none-any.whl` | `5e886fa7...` | なし | MIT | 写真・画像の EXIF メタデータ読み込み・書き込み・消去 |
 
 > `*` マークの付いた依存パッケージ（`matplotlib`, `lxml`, `pillow`, `typing-extensions`, `charset-normalizer`）は、Pyodide 内部に Wasm 最適化済みバイナリとして同梱されているため、余計な外部 wheel の二重取得を防止して Pyodide 提供版を優先利用します。
 

@@ -77,6 +77,15 @@
   plt.title("月別売上推移グラフ")
   plt.show()
 
+・seaborn (統計データ可視化・ヒートマップ・分布図)
+  import seaborn as sns
+  import matplotlib.pyplot as plt
+  import japanize_noto_sans_jp
+  df = pd.DataFrame({"部署": ["営業", "開発", "総務"], "満足度": [85, 92, 78]})
+  sns.barplot(data=df, x="部署", y="満足度")
+  plt.title("部署別満足度スコア")
+  plt.show()
+
 【データ分析・集計】
 ・pandas
   import pandas as pd
@@ -106,14 +115,25 @@
 
 
 ----------------------------------------------------------------------
-■ 3. テキスト処理・Web抽出・ユーティリティ
+■ 3. テキスト処理・Web抽出・画像・ユーティリティ
 ----------------------------------------------------------------------
+
+【Markdown 変換】
+・markdown
+  import markdown
+  html = markdown.markdown("# 見出し\n\n本文テキスト")
+  print(html)
 
 【HTML / XML 解析】
 ・beautifulsoup4 / lxml
   from bs4 import BeautifulSoup
   soup = BeautifulSoup("<html><body><h1>見出し</h1></body></html>", "html.parser")
   print(soup.h1.text)
+
+【画像 EXIF メタデータ操作】
+・piexif (写真の撮影情報読み書き・削除)
+  import piexif
+  exif_dict = piexif.load("photo.jpg")
 
 【テンプレート自動生成】
 ・jinja2

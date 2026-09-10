@@ -11,6 +11,7 @@ const DEFAULT_PRELOAD_PACKAGES = [
 
 const FALLBACK_LOCAL_WHEEL_PACKAGES = new Set([
   'japanize-noto-sans-jp',
+  'seaborn',
   'openpyxl',
   'python-docx',
   'python-pptx',
@@ -19,7 +20,9 @@ const FALLBACK_LOCAL_WHEEL_PACKAGES = new Set([
   'tabulate',
   'xlsxwriter',
   'et-xmlfile',
-  'defusedxml'
+  'defusedxml',
+  'markdown',
+  'piexif'
 ]);
 
 const LOCAL_WHEEL_PACKAGES = FALLBACK_LOCAL_WHEEL_PACKAGES;

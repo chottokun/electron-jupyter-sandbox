@@ -149,6 +149,7 @@ function createApplicationMenu(mainWindow, handlers = {}) {
       submenu: [
         { label: '--- ローカル追加パッケージ (wheels) ---', enabled: false },
         createPackageCheckbox('japanize-noto-sans-jp', 'japanize-noto-sans-jp (日本語フォント・設定)'),
+        createPackageCheckbox('seaborn', 'seaborn (統計データ可視化)'),
         createPackageCheckbox('openpyxl', 'openpyxl (Excel 入出力)'),
         createPackageCheckbox('python-docx', 'python-docx (Word 操作)'),
         createPackageCheckbox('python-pptx', 'python-pptx (PowerPoint 操作)'),
@@ -156,6 +157,8 @@ function createApplicationMenu(mainWindow, handlers = {}) {
         createPackageCheckbox('reportlab', 'reportlab (PDF 帳票生成)'),
         createPackageCheckbox('tabulate', 'tabulate (テキスト表フォーマット)'),
         createPackageCheckbox('xlsxwriter', 'xlsxwriter (Excel 高速生成)'),
+        createPackageCheckbox('markdown', 'markdown (Markdown パース・変換)'),
+        createPackageCheckbox('piexif', 'piexif (画像 EXIF メタデータ操作)'),
         { type: 'separator' },
         { label: '--- Pyodide標準分析パッケージ ---', enabled: false },
         createPackageCheckbox('matplotlib', 'matplotlib (グラフ描画)'),
