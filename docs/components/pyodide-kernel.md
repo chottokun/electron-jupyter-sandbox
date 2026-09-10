@@ -1,3 +1,5 @@
+[English](pyodide-kernel.en.md) | [日本語](pyodide-kernel.md)
+
 ---
 type: Component Specification
 title: Pyodide Wasm カーネルとローカル配信基盤
@@ -179,5 +181,3 @@ print("report.pdf を生成しました")
    - `.wasm` (`application/wasm`)、`.whl` (`application/x-wheel+zip`)、`.mjs` (`application/javascript`) を正しく配信。
 
 > 詳細なパッケージ一覧やハッシュ・ライセンス情報については [同梱 Python パッケージ一覧・ライセンスリファレンス](../references/bundled-packages.md) を参照してください。
-
-

@@ -1,3 +1,20 @@
+[English](best-practices-review.md) | [日本語](best-practices-review.md)
+
+---
+type: Reference Report
+title: ベストプラクティスレビュー・レポート
+description: セキュリティ、アーキテクチャ、エラーハンドリング、開発プロセスのベストプラクティス評価結果および実施した改善内容のレポート。
+tags:
+  - reference
+  - review
+  - best-practices
+  - security
+status: stable
+generated:
+  by: agent:antigravity
+  at: '2026-08-30T02:30:00Z'
+---
+
 # ベストプラクティスレビュー・レポート (Best Practices Review Report)
 
 本ドキュメントは、**Electron Jupyter Sandbox** におけるセキュリティ、アーキテクチャ、エラーハンドリング、開発プロセスのベストプラクティス評価結果および実施した改善内容をまとめたレポートです。

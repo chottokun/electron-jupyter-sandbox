@@ -1,3 +1,21 @@
+[English](security-network-policy.en.md) | [日本語](security-network-policy.md)
+
+---
+type: Architecture Specification
+title: セキュリティ＆ネットワークポリシー設計書
+description: 外部通信制御、多層防御、およびビルド時セキュリティポリシーの仕様解説。
+tags:
+  - security
+  - network
+  - policy
+  - electron
+  - pyodide
+status: stable
+generated:
+  by: agent:antigravity
+  at: '2026-09-02T00:00:00Z'
+---
+
 # セキュリティ＆ネットワークポリシー設計書
 
 `electron-jupyter-sandbox` における外部通信制御、多層防御、およびビルド時セキュリティポリシーの仕様解説です。

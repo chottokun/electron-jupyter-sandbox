@@ -1,5 +1,10 @@
 # Directory Update Log
 
+## 2026-09-10
+* **v2.0.0 Major Release**: Integrated Node.js `FileContentsManager` (`src/contents-api.js`) and JupyterLab `HostDrive` extension (`packages/host-drive-extension`) for direct host directory binding (`data/notebooks/`) with path traversal security enforcement (by agent:jules)
+* **Bilingual Symmetry & OKF v0.2 Alignment**: Created full English documentation counterparts across Tier 1 & Tier 2 specs ([contents-api-and-host-drive.en.md](./components/contents-api-and-host-drive.en.md), [ai-copy-extension.en.md](./components/ai-copy-extension.en.md), [pyodide-kernel.en.md](./components/pyodide-kernel.en.md), [security-network-policy.en.md](./architecture/security-network-policy.en.md), [version-matrix.en.md](./architecture/version-matrix.en.md), [offline-wheels.en.md](./playbooks/offline-wheels.en.md), [packaging-guide.en.md](./playbooks/packaging-guide.en.md)) with explicit language switchers and valid OKF v0.2 frontmatters (by agent:jules)
+* Added additional offline wheels (`seaborn`, `markdown`, `piexif`, `janome`, `soupsieve`, `defusedxml`) and updated index files across `docs/` (by agent:jules)
+
 ## 2026-09-09
 * Added automated wheel management scripts (`scripts/add_wheels.py`, `scripts/verify_wheels.py`), pytest suite, and CI verification step (by agent:antigravity)
 * Bundled office suite Python packages (`openpyxl`, `xlsxwriter`, `python-docx`, `python-pptx`, `pypdf`, `reportlab`, etc.) into `wheels/` and `jupyterlite/pypi/` (by agent:antigravity)
