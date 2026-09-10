@@ -2,7 +2,14 @@
 
 # Electron Jupyter Sandbox (Fully Isolated & AI-Integrated Desktop Jupyter Environment)
 
+[![CI](https://github.com/chottokun/electron-jupyter-sandbox/actions/workflows/ci.yml/badge.svg)](https://github.com/chottokun/electron-jupyter-sandbox/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/chottokun/electron-jupyter-sandbox?color=blue&logo=github)](https://github.com/chottokun/electron-jupyter-sandbox/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-informational)](#)
+[![Python: Pyodide](https://img.shields.io/badge/Pyodide-314.0.5-3776AB?logo=python&logoColor=white)](docs/architecture/version-matrix.md)
+
 A desktop application that wraps **JupyterLite** (powered by WebAssembly / Pyodide) inside **Electron**, providing a completely isolated and fully offline Python execution environment that leaves zero footprint on your local OS environment.
+
 
 It comes standard with an integrated JupyterLab extension that **generates and copies optimal prompts for AI (Local LLMs / Web AI Chats) with a single click** when code execution errors occur.
 

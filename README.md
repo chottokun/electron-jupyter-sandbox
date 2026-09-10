@@ -2,7 +2,14 @@
 
 # Electron Jupyter Sandbox (完全隔離型・AI連携デスクトップJupyter環境)
 
+[![CI](https://github.com/chottokun/electron-jupyter-sandbox/actions/workflows/ci.yml/badge.svg)](https://github.com/chottokun/electron-jupyter-sandbox/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/chottokun/electron-jupyter-sandbox?color=blue&logo=github)](https://github.com/chottokun/electron-jupyter-sandbox/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-informational)](#)
+[![Python: Pyodide](https://img.shields.io/badge/Pyodide-314.0.5-3776AB?logo=python&logoColor=white)](docs/architecture/version-matrix.md)
+
 WebAssembly (Pyodide) ベースの **JupyterLite** を **Electron** でラップし、ローカルPCの環境を一切汚さない「完全隔離型・完全オフライン」のPython実行環境を提供するデスクトップアプリケーションです。
+
 
 さらに、コード実行エラー時に **AI（ローカルLLM / Web AIチャット）へ渡す最適なプロンプトをワンクリックで生成・コピーできる機能** をJupyterLab拡張機能として標準統合しています。
 
