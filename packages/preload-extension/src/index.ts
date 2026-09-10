@@ -23,13 +23,24 @@ const preloadPlugin: JupyterFrontEndPlugin<void> = {
       // jupyter-config-data から設定を取得
       let pyodidePackages: string[] = [];
       let piplitePackages: string[] = [];
+      // 多層防御: パッケージ名が正規表現に合致するもののみ許可
+      const sanitizeList = (list: unknown): string[] => {
+        if (!Array.isArray(list)) return [];
+        return list.filter((name): name is string =>
+          typeof name === 'string' &&
+          name.length > 0 &&
+          name.length <= 100 &&
+          /^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(name)
+        );
+      };
+
       try {
         const raw = PageConfig.getOption('litePluginSettings') || PageConfig.getOption('settingsOverrides');
         if (raw) {
           const settings = JSON.parse(raw);
           const kSettings = settings['@jupyterlite/pyodide-kernel-extension:kernel'] || {};
-          pyodidePackages = kSettings.loadPyodideOptions?.packages || [];
-          piplitePackages = kSettings.piplitePreloadPackages || [];
+          pyodidePackages = sanitizeList(kSettings.loadPyodideOptions?.packages);
+          piplitePackages = sanitizeList(kSettings.piplitePreloadPackages);
         }
       } catch (err) {
         console.warn('[Preload] 設定のパースに失敗しました:', err);

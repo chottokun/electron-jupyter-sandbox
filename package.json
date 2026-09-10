@@ -31,8 +31,6 @@
     "wheels:audit": "uv run python scripts/add_wheels.py --audit",
     "test:wheels": "uv run pytest tests/test_wheels.py -v"
   },
-
-
   "build": {
     "appId": "com.example.electron-jupyter-sandbox",
     "productName": "JupyterSandbox",
