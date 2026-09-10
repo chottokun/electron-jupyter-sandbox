@@ -5,6 +5,9 @@ const path = require('node:path');
 const os = require('node:os');
 const {
   DEFAULT_PRELOAD_PACKAGES,
+  isValidPackageName,
+  normalizePackageName,
+  getLocalWheelPackageSet,
   loadConfig,
   saveConfig,
   getResolvedDataDir,
@@ -13,7 +16,8 @@ const {
   resetRuntimeNetworkAllowed,
   getPreloadPackages,
   isPreloadPackageEnabled,
-  setPreloadPackageEnabled
+  setPreloadPackageEnabled,
+  getCategorizedPreloadPackages
 } = require('../src/config');
 
 
@@ -114,3 +118,50 @@ test('getPreloadPackages, isPreloadPackageEnabled, and setPreloadPackageEnabled 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+test('isValidPackageName validates package names correctly and prevents injection', () => {
+  assert.strictEqual(isValidPackageName('matplotlib'), true);
+  assert.strictEqual(isValidPackageName('japanize-noto-sans-jp'), true);
+  assert.strictEqual(isValidPackageName('python_docx'), true);
+  assert.strictEqual(isValidPackageName('a'), true);
+
+  // 異常系・インジェクション攻撃文字列の除外
+  assert.strictEqual(isValidPackageName(''), false);
+  assert.strictEqual(isValidPackageName('invalid;import os'), false);
+  assert.strictEqual(isValidPackageName('pkgName"'), false);
+  assert.strictEqual(isValidPackageName('-invalid'), false);
+  assert.strictEqual(isValidPackageName('invalid-'), false);
+  assert.strictEqual(isValidPackageName(null), false);
+  assert.strictEqual(isValidPackageName(123), false);
+});
+
+test('normalizePackageName normalizes package names', () => {
+  assert.strictEqual(normalizePackageName('Japanize_Noto_Sans_JP'), 'japanize-noto-sans-jp');
+  assert.strictEqual(normalizePackageName('Python.Docx'), 'python-docx');
+});
+
+test('getCategorizedPreloadPackages handles dynamic manifest and sanitizes invalid names', () => {
+  const tmpDir = createTmpDir();
+  const configFilePath = path.join(tmpDir, 'config.json');
+  const customManifestPath = path.join(tmpDir, 'manifest.json');
+
+  fs.writeFileSync(customManifestPath, JSON.stringify({
+    packages: {
+      'custom-local-pkg': { name: 'custom-local-pkg' }
+    }
+  }), 'utf-8');
+
+  saveConfig(configFilePath, {
+    preloadPackages: [
+      'custom-local-pkg',
+      'matplotlib',
+      'invalid;package',
+      'japanize-noto-sans-jp'
+    ]
+  });
+
+  const categorized = getCategorizedPreloadPackages(configFilePath, customManifestPath);
+  assert.deepStrictEqual(categorized.pyodidePackages, ['matplotlib', 'japanize-noto-sans-jp']);
+  assert.deepStrictEqual(categorized.piplitePackages, ['custom-local-pkg']);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
