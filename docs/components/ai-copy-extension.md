@@ -1,3 +1,5 @@
+[English](ai-copy-extension.en.md) | [日本語](ai-copy-extension.md)
+
 ---
 type: Component Specification
 title: AI エラーコピー拡張機能 仕様とカスタマイズ

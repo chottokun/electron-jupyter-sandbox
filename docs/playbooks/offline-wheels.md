@@ -1,3 +1,5 @@
+[English](offline-wheels.en.md) | [日本語](offline-wheels.md)
+
 ---
 type: Playbook
 title: 完全オフライン Wheel 追加手順書
@@ -170,4 +172,3 @@ flowchart TD
    ```bash
    npm run wheels:verify
    ```
-

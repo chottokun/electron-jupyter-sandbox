@@ -1,3 +1,5 @@
+[English](packaging-guide.en.md) | [日本語](packaging-guide.md)
+
 ---
 type: Playbook
 title: Electron パッケージング手順書
