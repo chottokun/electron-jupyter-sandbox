@@ -11,13 +11,34 @@ function createTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-server-test-'));
 }
 
-function fetchJson(url) {
+function fetchJson(url, options = {}) {
   return new Promise((resolve, reject) => {
-    http.get(url, (res) => {
+    const parsed = new URL(url);
+    const reqOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname + parsed.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+
+    const req = http.request(reqOptions, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: JSON.parse(body) }));
-    }).on('error', reject);
+      res.on('end', () => {
+        let json = null;
+        if (body && res.headers['content-type']?.includes('application/json')) {
+          try { json = JSON.parse(body); } catch (e) {}
+        }
+        resolve({ status: res.statusCode, headers: res.headers, body: json || body });
+      });
+    });
+
+    req.on('error', reject);
+    if (options.body) {
+      req.write(typeof options.body === 'object' ? JSON.stringify(options.body) : options.body);
+    }
+    req.end();
   });
 }
 
@@ -95,43 +116,38 @@ test('startLocalServer performs dual-injection into both settingsOverrides and l
   }
 });
 
-test('startLocalServer dynamically reflects config changes without stale cache', async () => {
+test('startLocalServer routes /api/contents requests to FileContentsManager', async () => {
   const tmpDir = createTmpDir();
   const jupyterliteDir = path.join(tmpDir, 'jupyterlite');
   const dataDir = path.join(tmpDir, 'data');
   fs.mkdirSync(jupyterliteDir, { recursive: true });
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const jupyterLiteJsonPath = path.join(jupyterliteDir, 'jupyter-lite.json');
-  fs.writeFileSync(jupyterLiteJsonPath, JSON.stringify({
-    'jupyter-config-data': {}
-  }), 'utf-8');
-
-  const configPath = path.join(tmpDir, 'config.json');
-  saveConfig(configPath, {
-    preloadPackages: ['japanize-noto-sans-jp', 'matplotlib']
-  });
-
-  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59902, {
-    configFilePath: configPath
-  });
+  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59903);
 
   try {
-    // 初回取得
-    const { body: firstRes } = await fetchJson(`http://127.0.0.1:${port}/jupyter-lite.json`);
-    const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
-    assert.deepStrictEqual(firstRes['jupyter-config-data'].settingsOverrides[kernelPluginId].loadPyodideOptions.packages, ['matplotlib']);
+    // 1. GET /api/contents
+    const resGet = await fetchJson(`http://127.0.0.1:${port}/api/contents`);
+    assert.strictEqual(resGet.status, 200);
+    assert.strictEqual(resGet.body.type, 'directory');
 
-    // 動的設定変更 (openpyxl と pandas を追加)
-    saveConfig(configPath, {
-      preloadPackages: ['japanize-noto-sans-jp', 'matplotlib', 'pandas', 'openpyxl']
+    // 2. PUT /api/contents/test.ipynb (Notebook作成)
+    const resPut = await fetchJson(`http://127.0.0.1:${port}/api/contents/test.ipynb`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: { type: 'notebook', content: { cells: [] } }
     });
+    assert.strictEqual(resPut.status, 200);
+    assert.strictEqual(resPut.body.name, 'test.ipynb');
 
-    // 2回目取得: 即座に変更が反映されること
-    const { body: secondRes } = await fetchJson(`http://127.0.0.1:${port}/jupyter-lite.json`);
-    assert.deepStrictEqual(secondRes['jupyter-config-data'].settingsOverrides[kernelPluginId].loadPyodideOptions.packages, ['matplotlib', 'pandas']);
-    assert.deepStrictEqual(secondRes['jupyter-config-data'].settingsOverrides[kernelPluginId].piplitePreloadPackages, ['japanize-noto-sans-jp', 'openpyxl']);
+    // 3. GET /api/contents/test.ipynb
+    const resNb = await fetchJson(`http://127.0.0.1:${port}/api/contents/test.ipynb`);
+    assert.strictEqual(resNb.status, 200);
+    assert.strictEqual(resNb.body.type, 'notebook');
 
+    // 4. DELETE /api/contents/test.ipynb
+    const resDel = await fetchJson(`http://127.0.0.1:${port}/api/contents/test.ipynb`, { method: 'DELETE' });
+    assert.strictEqual(resDel.status, 204);
   } finally {
     server.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });

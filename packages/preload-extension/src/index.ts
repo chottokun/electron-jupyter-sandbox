@@ -3,6 +3,7 @@ import { INotebookTracker, NotebookPanel } from '@jupyterlab/notebook';
 import { PageConfig } from '@jupyterlab/coreutils';
 
 const executedSessionIds = new Set<string>();
+const MAX_SYNC_FILE_SIZE = 20 * 1024 * 1024; // 20MB 上限
 
 const preloadPlugin: JupyterFrontEndPlugin<void> = {
   id: 'electron-jupyter-sandbox:preload-extension',
@@ -52,10 +53,18 @@ const preloadPlugin: JupyterFrontEndPlugin<void> = {
         piplitePackages = ['japanize-noto-sans-jp', 'openpyxl'];
       }
 
+      const nbPath = panel.context.path || '';
+      const pathParts = nbPath.split('/');
+      pathParts.pop();
+      const parentDir = pathParts.join('/');
+      const baseUrl = PageConfig.getBaseUrl();
+
       // トップレベル await による確定同期実行（競合回避）
       const pyScript = `
 async def _sandbox_auto_preload():
-    import pyodide, piplite, importlib
+    import pyodide, piplite, importlib, os, json
+    from pyodide.http import pyfetch
+
     py_pkgs = ${JSON.stringify(pyodidePackages)}
     pip_pkgs = ${JSON.stringify(piplitePackages)}
     if py_pkgs:
@@ -68,6 +77,36 @@ async def _sandbox_auto_preload():
             await piplite.install(pip_pkgs, keep_going=True)
         except Exception as e:
             print(f"[Preload Warning] Piplite install failed: {e}")
+
+    # カレントディレクトリのデータファイルを MEMFS へ透過ロード (20MB以下)
+    try:
+        dir_url = f"${baseUrl}api/contents/${parentDir}".rstrip("/")
+        resp = await pyfetch(dir_url)
+        if resp.status == 200:
+            data = await resp.json()
+            if data.get("type") == "directory":
+                for item in data.get("content", []):
+                    if item.get("type") == "file":
+                        fname = item.get("name")
+                        fsize = item.get("size") or 0
+                        if fname and not fname.startswith(".") and fsize <= ${MAX_SYNC_FILE_SIZE}:
+                            f_url = f"{dir_url}/{fname}"
+                            f_resp = await pyfetch(f_url)
+                            if f_resp.status == 200:
+                                f_data = await f_resp.json()
+                                f_content = f_data.get("content")
+                                f_format = f_data.get("format")
+                                if f_content is not None:
+                                    if f_format == "base64":
+                                        import base64
+                                        with open(fname, "wb") as f:
+                                            f.write(base64.b64decode(f_content))
+                                    else:
+                                        with open(fname, "w", encoding="utf-8") as f:
+                                            f.write(f_content)
+    except Exception as e:
+        print(f"[Preload Warning] Host data sync failed: {e}")
+
     importlib.invalidate_caches()
 
 await _sandbox_auto_preload()
@@ -80,7 +119,7 @@ await _sandbox_auto_preload()
       });
 
       future.done.then(() => {
-        console.log('[Preload] パッケージのプリロードが完了しました:', { pyodidePackages, piplitePackages });
+        console.log('[Preload] パッケージおよびホストデータのプリロードが完了しました:', { pyodidePackages, piplitePackages });
       });
     };
 

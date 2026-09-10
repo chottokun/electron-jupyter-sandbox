@@ -4,7 +4,8 @@
     "apps": ["lab"],
     "federated_extensions": [
       "packages/ai-copy-extension/labextension",
-      "packages/preload-extension/labextension"
+      "packages/preload-extension/labextension",
+      "packages/host-drive-extension/labextension"
     ]
   },
   "PyodideAddon": {
