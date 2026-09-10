@@ -5,6 +5,7 @@ const url = require('url');
 const { logger } = require('./logger');
 const { loadOverrides } = require('./settings');
 const { getCategorizedPreloadPackages } = require('./config');
+const { FileContentsManager } = require('./contents-api');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -49,18 +50,157 @@ function resolveSafePath(rootDir, relativePath) {
   return filePath;
 }
 
+/**
+ * REST API /api/contents リクエストを処理する関数
+ */
+async function handleContentsApi(req, res, contentsManager, parsedUrl) {
+  const pathname = decodeURIComponent(parsedUrl.pathname);
+  // /api/contents または /api/contents/ 以降のパス
+  const apiSubPath = pathname.substring('/api/contents'.length);
+  const cleanApiPath = apiSubPath.replace(/^[/\\]+/, '');
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    return res.end();
+  }
+
+  // リクエストボディの読み込みヘルパー
+  const readJsonBody = () => new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+
+  try {
+    // 1. チェックポイント ルーティング
+    // パス末尾の /checkpoints または /checkpoints/<checkpoint_id> にマッチ
+    const checkpointMatch = cleanApiPath.match(/^(?:(.*)\/)?checkpoints(?:\/([^/]+))?$/);
+    if (checkpointMatch) {
+      const targetApiPath = checkpointMatch[1] || '';
+      const checkpointId = checkpointMatch[2];
+
+      if (req.method === 'GET') {
+        const list = await contentsManager.listCheckpoints(targetApiPath);
+        res.writeHead(200);
+        return res.end(JSON.stringify(list));
+      } else if (req.method === 'POST') {
+        // Restore もしくは Create
+        let body = {};
+        try { body = await readJsonBody(); } catch (e) {}
+        if (checkpointId) {
+          // Restore
+          await contentsManager.restoreCheckpoint(targetApiPath, checkpointId);
+          res.writeHead(204);
+          return res.end();
+        } else {
+          // Create
+          const cp = await contentsManager.createCheckpoint(targetApiPath);
+          res.writeHead(201);
+          return res.end(JSON.stringify(cp));
+        }
+      } else if (req.method === 'DELETE' && checkpointId) {
+        await contentsManager.deleteCheckpoint(targetApiPath, checkpointId);
+        res.writeHead(204);
+        return res.end();
+      }
+    }
+
+    // 2. 通常の Contents API ルーティング
+    if (req.method === 'GET') {
+      const contentParam = parsedUrl.searchParams.get('content') !== '0';
+      const typeParam = parsedUrl.searchParams.get('type') || null;
+      const formatParam = parsedUrl.searchParams.get('format') || null;
+
+      const model = await contentsManager.get(cleanApiPath, {
+        content: contentParam,
+        type: typeParam,
+        format: formatParam
+      });
+      res.writeHead(200);
+      return res.end(JSON.stringify(model));
+    } else if (req.method === 'POST') {
+      const body = await readJsonBody();
+      if (body.copy_from) {
+        // コピー操作
+        const model = await contentsManager.copy(body.copy_from, cleanApiPath);
+        res.writeHead(201);
+        return res.end(JSON.stringify(model));
+      } else {
+        // new_untitled 操作
+        const model = await contentsManager.newUntitled(cleanApiPath, {
+          type: body.type || 'notebook',
+          ext: body.ext || ''
+        });
+        res.writeHead(201);
+        return res.end(JSON.stringify(model));
+      }
+    } else if (req.method === 'PUT') {
+      const body = await readJsonBody();
+      const model = await contentsManager.save(body, cleanApiPath);
+      res.writeHead(200);
+      return res.end(JSON.stringify(model));
+    } else if (req.method === 'PATCH') {
+      const body = await readJsonBody();
+      if (body.path) {
+        const model = await contentsManager.rename(cleanApiPath, body.path);
+        res.writeHead(200);
+        return res.end(JSON.stringify(model));
+      } else {
+        const model = await contentsManager.get(cleanApiPath, { content: false });
+        res.writeHead(200);
+        return res.end(JSON.stringify(model));
+      }
+    } else if (req.method === 'DELETE') {
+      await contentsManager.delete(cleanApiPath);
+      res.writeHead(204);
+      return res.end();
+    } else {
+      res.writeHead(455);
+      return res.end(JSON.stringify({ message: 'Method Not Allowed' }));
+    }
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    res.writeHead(statusCode);
+    return res.end(JSON.stringify({ message: err.message }));
+  }
+}
+
 function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT, options = {}) {
   const isExternalNetworkAllowed = typeof options === 'function' ? options : options.isExternalNetworkAllowed;
   const configFilePath = (typeof options === 'object' && options !== null && options.configFilePath)
     ? options.configFilePath
     : path.join(path.dirname(currentDataDir), 'config.json');
 
+  const notebooksDir = path.join(currentDataDir, 'notebooks');
+  if (!fs.existsSync(notebooksDir)) {
+    fs.mkdirSync(notebooksDir, { recursive: true });
+  }
+  const contentsManager = new FileContentsManager(notebooksDir);
+
   return new Promise((resolve, reject) => {
     let serverPort = 0;
-    const server = http.createServer((req, res) => {
+    const server = http.createServer(async (req, res) => {
       try {
         const parsedUrl = new url.URL(req.url, `http://127.0.0.1:${serverPort}`);
         const relativePath = decodeURIComponent(parsedUrl.pathname);
+
+        // /api/contents へのリクエストを横取りして Contents API で処理
+        if (relativePath === '/api/contents' || relativePath.startsWith('/api/contents/')) {
+          return await handleContentsApi(req, res, contentsManager, parsedUrl);
+        }
 
         const filePath = resolveSafePath(rootDir, relativePath);
 
@@ -175,5 +315,6 @@ module.exports = {
   MIME_TYPES,
   DEFAULT_PORT,
   resolveSafePath,
-  startLocalServer
+  startLocalServer,
+  handleContentsApi
 };

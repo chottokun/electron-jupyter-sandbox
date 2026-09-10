@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 .venv/
+.yarn/
 
 # Build Outputs & Generated Assets
 dist/

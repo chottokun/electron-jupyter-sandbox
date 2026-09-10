@@ -13,8 +13,6 @@ const { getSecurityMode, isNetworkConfigurable } = require('./policy');
 // Private Network Access (127.0.0.1 からの外部 fetch 制限) の解除
 app.commandLine.appendSwitch('disable-features', 'BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights');
 
-
-
 // アプリケーションのベースディレクトリ解決
 const appRootDir = app.isPackaged
   ? path.dirname(app.getPath('exe'))
@@ -40,6 +38,52 @@ try {
   console.error('Failed to initialize data directory:', e);
 }
 
+// <dataDir>/notebooks/ ディレクトリの初期化および初期ノートブック配置
+const notebooksDir = path.join(currentDataDir, 'notebooks');
+try {
+  if (!fs.existsSync(notebooksDir)) {
+    fs.mkdirSync(notebooksDir, { recursive: true });
+  }
+  const welcomePath = path.join(notebooksDir, 'welcome.ipynb');
+  if (!fs.existsSync(welcomePath)) {
+    const defaultWelcomeModel = {
+      cells: [
+        {
+          cell_type: 'markdown',
+          metadata: {},
+          source: [
+            '# 🎉 Electron Jupyter Sandbox へようこそ！\n',
+            '\n',
+            'この環境は、ホストOSのローカルフォルダ (`data/notebooks/`) と直接結合された **完全隔離型 Jupyter 環境** です。\n',
+            '\n',
+            '- **ローカル直接保存**: 作成・編集したノートブックやファイルはホストOSの `data/notebooks/` に即座に自動保存されます。\n',
+            '- **データ共有**: `data/notebooks/` に配置した CSV や TXT などのデータファイルは、`pd.read_csv("sample.csv")` などの標準Pythonコードから直接読み込めます。\n',
+            '- **完全オフライン保証**: 外部インターネット通信は完全に遮断されており、機密データも安心してお使いいただけます。'
+          ]
+        },
+        {
+          cell_type: 'code',
+          execution_count: null,
+          metadata: {},
+          outputs: [],
+          source: [
+            'import pandas as pd\n',
+            'import numpy as np\n',
+            'print("Hello, Electron Jupyter Sandbox!")'
+          ]
+        }
+      ],
+      metadata: {
+        language_info: { name: 'python' }
+      },
+      nbformat: 4,
+      nbformat_minor: 5
+    };
+    fs.writeFileSync(welcomePath, JSON.stringify(defaultWelcomeModel, null, 1) + '\n', 'utf-8');
+  }
+} catch (e) {
+  console.error('Failed to initialize notebooks directory:', e);
+}
 
 let serverInstance = null;
 
@@ -156,7 +200,6 @@ function createWindow(port) {
     }
   });
 
-
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
     logger.log(`RENDERER ${levelStr}`, `${message} (${sourceId}:${line})`, app.isPackaged, currentDataDir);
@@ -181,6 +224,7 @@ function createWindow(port) {
   createApplicationMenu(mainWindow, {
     changeDataDirectory,
     getResolvedDataDir: () => getResolvedDataDir(appRootDir, configFilePath),
+    getNotebooksDir: () => path.join(getResolvedDataDir(appRootDir, configFilePath), 'notebooks'),
     getOverridesPath: () => getOverridesPath(currentDataDir),
     getSettingsDir: () => getSettingsDir(currentDataDir),
     getLogPath: () => logger.getLogPath(currentDataDir),
@@ -236,7 +280,6 @@ if (!gotTheLock) {
     });
     serverInstance = server;
 
-
     const logHandler = (cat, msg) => logger.log(cat, msg, app.isPackaged, currentDataDir);
     const networkFilterOptions = {
       logFunc: logHandler,
@@ -248,7 +291,6 @@ if (!gotTheLock) {
     createWindow(port);
   });
 }
-
 
 ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({

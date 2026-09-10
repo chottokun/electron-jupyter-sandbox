@@ -15,6 +15,7 @@ function createApplicationMenu(mainWindow, handlers = {}) {
   const {
     changeDataDirectory = async () => {},
     getResolvedDataDir = () => '',
+    getNotebooksDir = () => '',
     getOverridesPath = () => '',
     getSettingsDir = () => '',
     getLogPath = () => '',
@@ -49,7 +50,6 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     }
   });
 
-
   const template = [
     // macOS専用 アプリケーションメニュー
     ...(isMac
@@ -75,6 +75,18 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     {
       label: 'ファイル',
       submenu: [
+        {
+          label: '📁 ノートブックフォルダを開く (エクスプローラー)',
+          click: async () => {
+            const nbDir = getNotebooksDir();
+            if (nbDir && fs.existsSync(nbDir)) {
+              await shell.openPath(nbDir);
+            } else {
+              dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${nbDir}`);
+            }
+          }
+        },
+        { type: 'separator' },
         {
           label: 'ノートブックをインポート (.ipynb)...',
           accelerator: 'CmdOrCtrl+O',
@@ -175,6 +187,17 @@ function createApplicationMenu(mainWindow, handlers = {}) {
       label: '設定',
       submenu: [
         {
+          label: '📁 ノートブックフォルダを開く (エクスプローラー)',
+          click: async () => {
+            const nbDir = getNotebooksDir();
+            if (nbDir && fs.existsSync(nbDir)) {
+              await shell.openPath(nbDir);
+            } else {
+              dialog.showErrorBox('エラー', `ディレクトリが存在しません: ${nbDir}`);
+            }
+          }
+        },
+        {
           label: 'データ保存先フォルダを変更...',
           click: async () => {
             await changeDataDirectory(mainWindow);
@@ -268,7 +291,6 @@ function createApplicationMenu(mainWindow, handlers = {}) {
                 }
               }
             ]
-
           : [
               {
                 label: '外部ネットワーク接続: 完全隔離 (変更不可)',
@@ -277,7 +299,6 @@ function createApplicationMenu(mainWindow, handlers = {}) {
             ])
       ]
     },
-
 
     // ヘルプ メニュー
     {
