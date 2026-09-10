@@ -44,7 +44,7 @@ test('path traversal check resolves safe paths inside rootDir and blocks outside
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('startLocalServer performs dual-injection into both settingsOverrides and litePluginSettings', async () => {
+test('startLocalServer performs dual-injection into both settingsOverrides and litePluginSettings with custom options', async () => {
   const tmpDir = createTmpDir();
   const jupyterliteDir = path.join(tmpDir, 'jupyterlite');
   const dataDir = path.join(tmpDir, 'data');
@@ -58,12 +58,15 @@ test('startLocalServer performs dual-injection into both settingsOverrides and l
     }
   }), 'utf-8');
 
-  const configPath = path.join(tmpDir, 'config.json');
+  const configPath = path.join(tmpDir, 'custom_config.json');
   saveConfig(configPath, {
     preloadPackages: ['japanize-noto-sans-jp', 'matplotlib', 'pandas', 'openpyxl']
   });
 
-  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59901);
+  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59901, {
+    configFilePath: configPath,
+    isExternalNetworkAllowed: () => false
+  });
 
   try {
     const { status, body: resData } = await fetchJson(`http://127.0.0.1:${port}/jupyter-lite.json`);
@@ -109,7 +112,9 @@ test('startLocalServer dynamically reflects config changes without stale cache',
     preloadPackages: ['japanize-noto-sans-jp', 'matplotlib']
   });
 
-  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59902);
+  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59902, {
+    configFilePath: configPath
+  });
 
   try {
     // 初回取得

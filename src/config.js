@@ -9,7 +9,7 @@ const DEFAULT_PRELOAD_PACKAGES = [
   'openpyxl'
 ];
 
-const LOCAL_WHEEL_PACKAGES = new Set([
+const FALLBACK_LOCAL_WHEEL_PACKAGES = new Set([
   'japanize-noto-sans-jp',
   'openpyxl',
   'python-docx',
@@ -21,6 +21,44 @@ const LOCAL_WHEEL_PACKAGES = new Set([
   'et-xmlfile',
   'defusedxml'
 ]);
+
+const LOCAL_WHEEL_PACKAGES = FALLBACK_LOCAL_WHEEL_PACKAGES;
+
+const PACKAGE_NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
+
+function isValidPackageName(name) {
+  if (typeof name !== 'string' || name.length === 0 || name.length > 100) return false;
+  return PACKAGE_NAME_REGEX.test(name);
+}
+
+function normalizePackageName(name) {
+  return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+function getLocalWheelPackageSet(customManifestPath = null) {
+  const manifestPath = customManifestPath || path.resolve(__dirname, '../wheels/manifest.json');
+  try {
+    if (fs.existsSync(manifestPath)) {
+      const raw = fs.readFileSync(manifestPath, 'utf-8');
+      const manifest = JSON.parse(raw);
+      if (manifest && manifest.packages && typeof manifest.packages === 'object') {
+        const names = new Set();
+        for (const [normKey, info] of Object.entries(manifest.packages)) {
+          names.add(normKey);
+          names.add(normKey.replace(/-/g, '_'));
+          if (info && info.name) {
+            names.add(info.name);
+            names.add(info.name.toLowerCase().replace(/[-_.]+/g, '-'));
+          }
+        }
+        return names;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load wheels/manifest.json:', e);
+  }
+  return FALLBACK_LOCAL_WHEEL_PACKAGES;
+}
 
 let runtimeNetworkAllowed = null;
 
@@ -154,15 +192,21 @@ function setPreloadPackageEnabled(configFilePath, packageName, enabled) {
 /**
  * プリロード対象パッケージを Pyodide 標準パッケージと独自 wheel に分離して取得
  * @param {string} [configFilePath]
+ * @param {string} [customManifestPath]
  * @returns {{ pyodidePackages: string[], piplitePackages: string[] }}
  */
-function getCategorizedPreloadPackages(configFilePath = null) {
+function getCategorizedPreloadPackages(configFilePath = null, customManifestPath = null) {
   const allPackages = getPreloadPackages(configFilePath);
+  const localWheelPackages = getLocalWheelPackageSet(customManifestPath);
   const pyodidePackages = [];
   const piplitePackages = [];
 
   for (const pkg of allPackages) {
-    if (LOCAL_WHEEL_PACKAGES.has(pkg)) {
+    if (!isValidPackageName(pkg)) {
+      continue;
+    }
+    const norm = normalizePackageName(pkg);
+    if (localWheelPackages.has(pkg) || localWheelPackages.has(norm) || localWheelPackages.has(pkg.replace(/-/g, '_'))) {
       piplitePackages.push(pkg);
     } else {
       pyodidePackages.push(pkg);
@@ -175,6 +219,10 @@ function getCategorizedPreloadPackages(configFilePath = null) {
 module.exports = {
   DEFAULT_PRELOAD_PACKAGES,
   LOCAL_WHEEL_PACKAGES,
+  FALLBACK_LOCAL_WHEEL_PACKAGES,
+  isValidPackageName,
+  normalizePackageName,
+  getLocalWheelPackageSet,
   loadConfig,
   saveConfig,
   getResolvedDataDir,
@@ -186,5 +234,3 @@ module.exports = {
   setPreloadPackageEnabled,
   getCategorizedPreloadPackages
 };
-
-
