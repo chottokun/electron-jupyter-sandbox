@@ -6,11 +6,15 @@
   フォルダ先頭にある「00_JupyterSandbox起動.bat」
   または「JupyterSandbox.exe」をダブルクリックしてください。
 
-■ 特徴・仕様
+■ 同梱ライブラリとサンプルコード
+  利用可能な全ライブラリの一覧やサンプルコード（Excel/Word/PDF/グラフ描画等）は
+  同階層の「01_同梱ライブラリと使い方.txt」をご覧ください。
+
+■ 主な特徴・仕様
   ・完全オフライン動作
     外部ネットワークへの通信は一切行わず、安全に動作します。
   ・各種データサイエンス・オフィス系パッケージ同梱
-    NumPy, Pandas, Matplotlib, SciPy, Scikit-learn
+    NumPy, Pandas, Matplotlib, SciPy, Scikit-learn, SymPy, BeautifulSoup4
     Excel (openpyxl, xlsxwriter), Word (python-docx),
     PowerPoint (python-pptx), PDF (pypdf, reportlab),
     超軽量 Google Noto Sans JP サブセットフォント（760KB）

@@ -1,0 +1,135 @@
+======================================================================
+ JupyterSandbox 同梱ライブラリ一覧＆クイックリファレンス
+======================================================================
+
+本アプリケーションは完全オフライン環境（インターネット接続なし）で
+以下の豊富な Python ライブラリを即座に利用可能です。
+ノートブックのセル内で import するだけで動作します。
+
+----------------------------------------------------------------------
+■ 1. オフィス・ドキュメント操作系ライブラリ
+----------------------------------------------------------------------
+
+【Excel 読み書き】
+・openpyxl
+  import openpyxl
+  wb = openpyxl.Workbook()
+  ws = wb.active
+  ws['A1'] = "売上データ"
+  wb.save("output.xlsx")
+
+・xlsxwriter (高速書き込み・書式設定・グラフ作成)
+  import xlsxwriter
+  workbook = xlsxwriter.Workbook('chart.xlsx')
+  worksheet = workbook.add_worksheet()
+  worksheet.write('A1', 'Hello')
+  workbook.close()
+
+【Word 文書作成】
+・python-docx
+  import docx
+  doc = docx.Document()
+  doc.add_heading('月次報告書', level=1)
+  doc.add_paragraph('今月の業務進捗状況です。')
+  doc.save('report.docx')
+
+【PowerPoint プレゼンテーション作成】
+・python-pptx
+  from pptx import Presentation
+  prs = Presentation()
+  slide = prs.slides.add_slide(prs.slide_layouts[0])
+  slide.shapes.title.text = "企画提案書"
+  prs.save("presentation.pptx")
+
+【PDF 結合・分割・テキスト抽出】
+・pypdf
+  from pypdf import PdfWriter
+  merger = PdfWriter()
+  merger.append("doc1.pdf")
+  merger.append("doc2.pdf")
+  merger.write("merged.pdf")
+  merger.close()
+
+【PDF 帳票・グラフィック生成】
+・reportlab
+  from reportlab.pdfgen import canvas
+  c = canvas.Canvas("invoice.pdf")
+  c.drawString(100, 750, "INVOICE / 請求書")
+  c.save()
+
+【テーブルテキスト整形】
+・tabulate (Markdown / プレーンテキスト表出力)
+  from tabulate import tabulate
+  data = [["Alice", 24], ["Bob", 19]]
+  print(tabulate(data, headers=["Name", "Age"], tablefmt="github"))
+
+
+----------------------------------------------------------------------
+■ 2. データ分析・科学技術計算・可視化ライブラリ
+----------------------------------------------------------------------
+
+【日本語フォント対応・グラフ描画】
+・japanize_noto_sans_jp (自動で日本語フォントが適用されます)
+・matplotlib
+  import matplotlib.pyplot as plt
+  import japanize_noto_sans_jp  # 日本語文字化け防止
+  plt.plot([1, 2, 3], [4, 5, 6])
+  plt.title("月別売上推移グラフ")
+  plt.show()
+
+【データ分析・集計】
+・pandas
+  import pandas as pd
+  df = pd.DataFrame({"商品": ["リンゴ", "バナナ"], "価格": [150, 100]})
+  print(df.describe())
+
+【数値計算】
+・numpy
+  import numpy as np
+  arr = np.array([1, 2, 3, 4, 5])
+  print(arr.mean())
+
+【高度な科学技術計算】
+・scipy (線形代数・最適化・信号処理・統計検定)
+  from scipy import stats
+  print(stats.norm.cdf(0))
+
+【機械学習】
+・scikit-learn (回帰・分類・クラスタリング・評価)
+  from sklearn.linear_model import LinearRegression
+
+【数式処理・代数計算】
+・sympy (微分積分・方程式求解・数式整形)
+  import sympy as sp
+  x = sp.Symbol('x')
+  print(sp.diff(x**3 + 2*x, x))
+
+
+----------------------------------------------------------------------
+■ 3. テキスト処理・Web抽出・ユーティリティ
+----------------------------------------------------------------------
+
+【HTML / XML 解析】
+・beautifulsoup4 / lxml
+  from bs4 import BeautifulSoup
+  soup = BeautifulSoup("<html><body><h1>見出し</h1></body></html>", "html.parser")
+  print(soup.h1.text)
+
+【テンプレート自動生成】
+・jinja2
+  from jinja2 import Template
+  t = Template("Hello {{ name }}!")
+  print(t.render(name="World"))
+
+【進捗表示】
+・tqdm
+  from tqdm.auto import tqdm
+  import time
+  for i in tqdm(range(100)):
+      time.sleep(0.01)
+
+【画像処理】
+・pillow (PIL)
+  from PIL import Image
+
+======================================================================
