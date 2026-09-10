@@ -2,6 +2,10 @@
 node_modules/
 .venv/
 .yarn/
+.yarnrc.yml
+yarn.lock
+.pnp.*
+
 
 # Build Outputs & Generated Assets
 dist/
