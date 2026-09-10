@@ -110,18 +110,26 @@ flowchart TD
 
 ---
 
-### 🟢 利用可能なパッケージ（追加推奨）
+### 🟢 1. すでに最初から使えるパッケージ（同梱済み）
 
-| 分類 | パッケージ名 | 特徴・用途 | 同梱 / 追加種別 |
-| :--- | :--- | :--- | :--- |
-| **日本語処理** | `janome` | Pure Python の日本語形態素解析エンジン（辞書内蔵）。オフラインで分かち書きやテキストマイニングが可能。 | `wheels/` 追加可能 |
-| **テキスト解析** | `beautifulsoup4` | HTML/XML スクレイピング・パース。 | Pyodide 同梱 / `wheels/` |
-| **テンプレート** | `jinja2`, `markupsafe` | HTML/Markdown/設定ファイルのテンプレート自動生成。 | `wheels/` 追加可能 |
-| **ドキュメント** | `markdown`, `python-docx`, `openpyxl` | Markdown 変換、Word/Excel 操作。 | `wheels/` 追加可能 |
-| **数式・代数** | `sympy`, `mpmath` | 記号代数、微分積分、方程式求解、高精度計算。 | Pyodide 同梱 |
-| **ネットワーク** | `networkx` | グラフ理論、ネットワーク構造解析、最短経路探索。 | `wheels/` 追加可能 |
-| **可視化・統計** | `seaborn`, `altair` | 統計グラフ描画、宣言的ベクター可視化。 | Pyodide 同梱 / `wheels/` |
-| **ユーティリティ** | `tqdm`, `python-dateutil` | プログレスバー表示、高機能日付・時刻計算。 | `wheels/` 追加可能 |
+以下のパッケージは **追加作業不要** で、ノートブック上で `import` するだけで即座に利用可能です。
+
+* **Pyodide 標準同梱**: `numpy`, `pandas`, `matplotlib`, `scipy`, `scikit-learn`, `sympy`, `beautifulsoup4`, `altair`, `networkx`, `tqdm`, `jinja2`, `python-dateutil`, `lxml`, `pillow` など
+* **本アプリの `wheels/` 同梱済み**: `openpyxl`, `xlsxwriter`, `python-docx`, `python-pptx`, `pypdf`, `reportlab`, `tabulate`, `defusedxml`, `japanize-noto-sans-jp`
+
+---
+
+### 📦 2. 未同梱だが追加導入できるおすすめライブラリ（追加候補）
+
+必要に応じて `npm run wheels:add` で簡単に追加できる Pure Python ライブラリです。
+
+| 分類 | パッケージ名 | 用途・メリット |
+| :--- | :--- | :--- |
+| **日本語テキスト解析** | `janome` | 辞書内蔵の Pure Python 形態素解析器。外部通信不要で分かち書きやワードクラウド、頻度集計が可能。 |
+| **統計データ可視化** | `seaborn` | matplotlib ベースの美しい統計グラフ・ヒートマップ描画。 |
+| **Markdown 変換** | `markdown` | テキスト内の Markdown 記法を HTML / 構造化テキストにパース・変換。 |
+| **HTML 検索強化** | `soupsieve` | BeautifulSoup4 用のモダンな CSS セレクタ検索エンジン。 |
+| **画像 EXIF 解析** | `piexif` | 写真・画像データの EXIF メタデータをオフラインで安全に読み書き・削除。 |
 
 ---
 
