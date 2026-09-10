@@ -19,7 +19,7 @@
     "@jupyterlab/rendermime": "^4.0.0"
   },
   "devDependencies": {
-    "@jupyterlab/builder": "^4.0.0",
+    "@jupyter/builder": "^1.2.3",
     "rimraf": "^5.0.5",
     "typescript": "~5.3.0"
   },
