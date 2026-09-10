@@ -99,3 +99,10 @@ The technical documentation of this project is structured in compliance with **O
 1. **Guaranteed Fully Offline**: Electron's `webRequest` filter physically blocks external internet access outside `127.0.0.1`.
 2. **OS Protection**: Python code runs on WebAssembly (Pyodide) inside the browser sandbox, eliminating direct risk to the host OS filesystem.
 3. **Local Log Persistence**: All application communication and error logs are automatically recorded in `logs/app.log` within the user data directory (accessible directly from the "Help" menu).
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+

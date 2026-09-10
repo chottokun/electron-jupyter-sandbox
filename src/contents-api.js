@@ -1,6 +1,12 @@
+/**
+ * Jupyter Server Contents REST API implementation for Node.js
+ * Based on Jupyter Server's FileContentsManager specification (BSD-3-Clause).
+ */
+
 const path = require('path');
 const fs = require('fs');
 const fsPromises = fs.promises;
+
 
 class FileContentsManager {
   constructor(rootDir) {
