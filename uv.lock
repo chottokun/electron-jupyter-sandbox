@@ -967,16 +967,16 @@ wheels = [
 
 [[package]]
 name = "jupyterlite-core"
-version = "0.8.3"
+version = "0.8.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "doit" },
     { name = "jupyter-core" },
     { name = "pycparser", marker = "platform_python_implementation == 'PyPy'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/31/9b18a4cac1925ca9229c62a0a734554c91f8795b19dc6e2be18084334a56/jupyterlite_core-0.8.3.tar.gz", hash = "sha256:92735e2de4e1f67b411a218094d609b21350327d46454d89de84f113cd8440ae", size = 15791222, upload-time = "2026-08-20T14:27:29.986Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/89/762a30c0f7ba639e2766785b865cc8782370fc81009dcb15d1855ac25163/jupyterlite_core-0.8.4.tar.gz", hash = "sha256:49434d4cbe759eda96d94e04bd1ecc1f976888ee3110f96f408edf9ac1b69a99", size = 15801891, upload-time = "2026-09-22T08:46:05.101Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/f1/c527ec3191c1d4f3019c4fdf08697adfdbb4054e31b0282b559cf15d4aa4/jupyterlite_core-0.8.3-py3-none-any.whl", hash = "sha256:f61b1dc434368794850dfeb9089e91bc86a2741dd6966e061edb028c8112c2e3", size = 15803305, upload-time = "2026-08-20T14:27:26.402Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/6f/b8ddff4b5c3fe36e72cb2fc26d0a50f43097a418573ae20dd112e9cd67e8/jupyterlite_core-0.8.4-py3-none-any.whl", hash = "sha256:ea8f5371b367a373978fe9b230f60481420f2b62811782e492093416fbc9e552", size = 15815614, upload-time = "2026-09-22T08:46:01.951Z" },
 ]
 
 [[package]]
