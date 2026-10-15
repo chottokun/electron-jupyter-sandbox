@@ -85,6 +85,22 @@ The internal Node.js HTTP server (`src/server.js`) routes the following REST end
 | `DELETE` | `/api/contents/:path*` | Delete file/directory | `delete(apiPath)` |
 | `GET/POST/DELETE` | `/api/contents/:path*/checkpoints` | List, create, restore, or delete checkpoints (`.ipynb_checkpoints`) | `listCheckpoints()`, etc. |
 
+### Internal HTTP Server (`src/server.js`) Modular Architecture
+Following the Single Responsibility Principle, `src/server.js` is partitioned into distinct helper modules:
+
+* **`serveStaticFile`**: Static asset delivery (HTML, JS, CSS, Wasm, Wheels). Encapsulates path traversal validation, existence check, MIME resolution, security headers (`COOP`/`COEP`/`CORP`/`CSP`), and stream piping.
+* **`buildCspHeader`**: Dynamic Content Security Policy header generation based on runtime network configuration (Strict vs Configurable).
+* **`injectJupyterLiteConfig`**: Pure data transformation injecting user overrides and preloaded package configurations (`pyodidePackages` / `piplitePackages`) into `jupyter-lite.json`.
+* **`handleCheckpointsRoute`**: Routing handler for `/api/contents/.../checkpoints` REST operations (create, list, restore, idempotent delete).
+* **`readJsonBody`**: Asynchronous stream helper reading and parsing request JSON payloads safely.
+
+### Adversarial Testing Suite
+Automated adversarial verification in [tests/server.adversarial.test.js](file:///home/nobuhiko/Project/electron-jupyter-sandbox/tests/server.adversarial.test.js) tests edge cases with a "break things" mindset:
+1. **Multi-Encoding Traversal Defense**: Guards against double URL encoding (`%252e%252e%252f`), Windows backslashes (`..\`), and multi-slash prefixes, consistently yielding HTTP 404.
+2. **Malformed JSON Resilience**: Catches malformed payload syntax without crashing the process, returning HTTP 500 while remaining fully available for subsequent requests.
+3. **Idempotent Checkpoint Deletion**: Adheres to REST DELETE idempotency by responding with HTTP 204 when deleting non-existent checkpoints.
+4. **Dynamic CSP Policy Boundaries**: Verifies instant policy synchronization between strict isolation and external allowed modes.
+
 ---
 
 ## 2. Frontend Host Drive Extension (`packages/host-drive-extension`)

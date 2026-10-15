@@ -42,7 +42,22 @@ npm run build
 npm start
 ```
 
-### 4. 配布用パッケージのビルド (`dist/` に出力)
+### 4. テスト & 品質検証
+```bash
+# Node.js 単体テスト & キャラクタリゼーション/敵対的テスト (42件)
+npm test
+
+# 全テスト一括実行 (Node 単体テスト + Pytest ホイールテスト 33件)
+npm run test:all
+
+# Playwright による実機ヘッドレスUI & Pyodide カーネル実行 E2E 検証
+npm run test:e2e:runner
+
+# オフライン同梱ホイールのハッシュ & マニフェスト整合性検証 (62項目)
+npm run wheels:verify
+```
+
+### 5. 配布用パッケージのビルド (`dist/` に出力)
 ```bash
 # 事前アセットビルド (未実行の場合)
 npm run build

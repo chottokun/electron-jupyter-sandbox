@@ -85,6 +85,22 @@ toOsPath(apiPath = '') {
 | `DELETE` | `/api/contents/:path*` | ファイル/フォルダの削除 | `delete(apiPath)` |
 | `GET/POST/DELETE` | `/api/contents/:path*/checkpoints` | チェックポイント (.ipynb_checkpoints) の一覧・作成・復元・削除 | `listCheckpoints()` 等 |
 
+### 内部 HTTP サーバー (`src/server.js`) の責務分離アーキテクチャ
+`src/server.js` は単一責任の原則に従い、以下の独立したモジュール関数群に分離されています：
+
+* **`serveStaticFile`**: 静的アセット（HTML, JS, CSS, Wasm, ホイール等）の配信。パストラバーサル検証、存在チェック、MIME判定、セキュリティヘッダー（COOP/COEP/CORP/CSP）付与、ストリーム配信を一手に担います。
+* **`buildCspHeader`**: ネットワークポリシー設定（厳格モード / 許可モード）に応じた Content Security Policy ヘッダーの動的構築。
+* **`injectJupyterLiteConfig`**: `jupyter-lite.json` に対するユーザーオーバーライド設定およびプリロードパッケージ（`pyodidePackages` / `piplitePackages`）の二重注入。
+* **`handleCheckpointsRoute`**: `/api/contents/.../checkpoints` に対する REST 操作（作成・一覧・復元・冪等削除）のルーティング処理。
+* **`readJsonBody`**: リクエストストリームから非同期で JSON ペイロードを安全に抽出・パースするヘルパー。
+
+### 敵対的テスト（Adversarial Testing）による検証強化
+[tests/server.adversarial.test.js](file:///home/nobuhiko/Project/electron-jupyter-sandbox/tests/server.adversarial.test.js) により、「壊す視点」での堅牢性を自動テストしています：
+1. **パストラバーサル多層攻撃防御**: 二重URLエンコード（`%252e%252e%252f`）やWindowsスタイル（`..\`）、過剰スラッシュ混在時にも境界脱出が不可能であることを保証。
+2. **構文崩壊 JSON ペイロード耐性**: 壊れたペイロードを受信してもサーバーがクラッシュせず、HTTP 500 を返却した上で正常稼働を維持。
+3. **チェックポイント REST 冪等性**: 存在しないチェックポイントの削除要求に対し、REST DELETE の冪等性仕様に従い HTTP 204 を返却。
+4. **動的 CSP トグル境界値**: 外部通信許可フラグの動的切り替えに対する CSP ヘッダーの即時整合性を保証。
+
 ---
 
 ## 2. フロントエンド Host Drive 拡張機能 (`packages/host-drive-extension`)

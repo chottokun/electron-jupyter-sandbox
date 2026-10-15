@@ -42,7 +42,22 @@ npm run build
 npm start
 ```
 
-### 4. Build Distribution Package (Outputs to `dist/`)
+### 4. Testing & Quality Verification
+```bash
+# Node.js unit tests & characterization/adversarial suites (42 tests)
+npm test
+
+# Run all test suites (Node.js unit tests + Pytest wheel tests 33 tests)
+npm run test:all
+
+# Playwright headless Chromium real UI & Pyodide kernel execution E2E verification
+npm run test:e2e:runner
+
+# Offline bundled wheels SHA256 integrity & manifest validation (62 checks)
+npm run wheels:verify
+```
+
+### 5. Build Distribution Package (Outputs to `dist/`)
 ```bash
 # Build pre-requisite assets (if not already run)
 npm run build

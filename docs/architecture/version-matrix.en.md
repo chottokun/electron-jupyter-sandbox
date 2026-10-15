@@ -29,10 +29,12 @@ This document details verified versions for tools and core dependencies in this 
 | **Desktop Framework** | Electron | `^44.1.1` (44.1.1) | Security patches applied |
 | **Packaging** | electron-builder | `^26.15.3` | Linux(AppImage) / Win / Mac support |
 | **Python Manager** | uv | `>=0.4.0` | Local `.venv` / `pyproject.toml` management |
-| **JupyterLite Core** | `jupyterlite-core` | `0.8.3` | JupyterLab 4.6.3 / Notebook 7.6.2 |
+| **JupyterLite Core** | `jupyterlite-core` | `0.8.4` | JupyterLab 4.6.4 / Notebook 7.6.2 |
 | **Pyodide Kernel** | `jupyterlite-pyodide-kernel` | `0.8.5` | Bundles `piplite 0.8.5` |
 | **Wasm Runtime** | Pyodide | `314.0.5` | Python 3.14 Wasm (Strict match required) |
 | **Required Python Package** | `comm` | `0.2.3` (pure-python whl) | Essential for kernel initialization (`wheels/`) |
+| **Network / HTTP Runtime** | `urllib3` / `tornado` | `2.8.0` / `6.5.9` | Audited and verified compatibility |
+| **E2E Test Engine** | `playwright` | `1.64.0` | Headless Chromium real UI & kernel testing |
 | **JupyterLab Extensions** | `@jupyterlab/application` etc. | `^4.0.0` | `packages/ai-copy-extension` |
 
 ## 2. Key Version Compatibility Rules

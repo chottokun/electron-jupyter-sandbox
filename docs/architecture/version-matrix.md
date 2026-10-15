@@ -29,10 +29,12 @@ generated:
 | **デスクトップ基盤** | Electron | `^44.1.1` (44.1.1) | セキュリティ脆弱性対応済み |
 | **パッケージング** | electron-builder | `^26.15.3` | Linux(AppImage)/Win/Mac 対応 (JSベースモジュールコレクタ) |
 | **Python 管理** | uv | `>=0.4.0` | `.venv` / `pyproject.toml` ローカル管理 |
-| **JupyterLite コア** | `jupyterlite-core` | `0.8.3` | JupyterLab 4.6.3 / Notebook 7.6.2 |
+| **JupyterLite コア** | `jupyterlite-core` | `0.8.4` | JupyterLab 4.6.4 / Notebook 7.6.2 |
 | **Pyodide カーネル** | `jupyterlite-pyodide-kernel` | `0.8.5` | `piplite 0.8.5` 内包 |
 | **Wasm ランタイム** | Pyodide | `314.0.5` | Python 3.14 Wasm (互換性最重要) |
 | **必須 Python パッケージ** | `comm` | `0.2.3` (pure-python whl) | カーネル初期化に必須 (`wheels/`) |
+| **ネットワーク/HTTP基盤** | `urllib3` / `tornado` | `2.8.0` / `6.5.9` | セキュリティスキャン・互換性検証済み |
+| **E2E 自動検証基盤** | `playwright` | `1.64.0` | Chromium による実機ヘッドレスUI・カーネル実行検証 |
 | **JupyterLab 拡張** | `@jupyterlab/application` 等 | `^4.0.0` | `packages/ai-copy-extension` |
 
 ## 2. バージョン整合性における重要ルール
