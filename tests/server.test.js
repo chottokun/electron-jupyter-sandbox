@@ -116,6 +116,99 @@ test('startLocalServer performs dual-injection into both settingsOverrides and l
   }
 });
 
+test('startLocalServer serves static files with MIME types and security headers, and handles 404/403', async () => {
+  const tmpDir = createTmpDir();
+  const jupyterliteDir = path.join(tmpDir, 'jupyterlite');
+  const dataDir = path.join(tmpDir, 'data');
+  fs.mkdirSync(jupyterliteDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  fs.writeFileSync(path.join(jupyterliteDir, 'style.css'), 'body { margin: 0; }', 'utf-8');
+
+  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59904, {
+    isExternalNetworkAllowed: () => false
+  });
+
+  try {
+    // 1. Static file success
+    const resCss = await fetchJson(`http://127.0.0.1:${port}/style.css`);
+    assert.strictEqual(resCss.status, 200);
+    assert.strictEqual(resCss.headers['content-type'], 'text/css; charset=utf-8');
+    assert.ok(resCss.headers['content-security-policy']);
+    assert.strictEqual(resCss.headers['cross-origin-opener-policy'], 'same-origin');
+    assert.strictEqual(resCss.headers['cross-origin-embedder-policy'], 'credentialless');
+
+    // 2. 404 Not Found
+    const res404 = await fetchJson(`http://127.0.0.1:${port}/nonexistent.js`);
+    assert.strictEqual(res404.status, 404);
+
+    // 3. Safe path resolution prevents escaping root dir (file inside root is sought, resulting in 404 if not found)
+    const resTraverse = await fetchJson(`http://127.0.0.1:${port}/..%2f..%2fsecret.txt`);
+    assert.strictEqual(resTraverse.status, 404);
+  } finally {
+    server.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('handleContentsApi handles OPTIONS preflight, errors, and checkpoints', async () => {
+  const tmpDir = createTmpDir();
+  const jupyterliteDir = path.join(tmpDir, 'jupyterlite');
+  const dataDir = path.join(tmpDir, 'data');
+  fs.mkdirSync(jupyterliteDir, { recursive: true });
+  fs.mkdirSync(dataDir, { recursive: true });
+
+  const { server, port } = await startLocalServer(jupyterliteDir, dataDir, 59905);
+
+  try {
+    // 1. OPTIONS preflight
+    const resOpt = await fetchJson(`http://127.0.0.1:${port}/api/contents/sample.txt`, { method: 'OPTIONS' });
+    assert.strictEqual(resOpt.status, 200);
+    assert.strictEqual(resOpt.headers['access-control-allow-origin'], '*');
+    assert.ok(resOpt.headers['access-control-allow-methods']);
+
+    // 2. 404 Error response for missing file
+    const resErr = await fetchJson(`http://127.0.0.1:${port}/api/contents/missing.txt`);
+    assert.strictEqual(resErr.status, 404);
+    assert.strictEqual(typeof resErr.body.message, 'string');
+
+    // 3. Checkpoints API
+    const resPut = await fetchJson(`http://127.0.0.1:${port}/api/contents/cp_test.ipynb`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: { type: 'notebook', content: { cells: [] } }
+    });
+    assert.strictEqual(resPut.status, 200);
+
+    // POST create checkpoint
+    const resCpCreate = await fetchJson(`http://127.0.0.1:${port}/api/contents/cp_test.ipynb/checkpoints`, {
+      method: 'POST'
+    });
+    assert.strictEqual(resCpCreate.status, 201);
+    assert.strictEqual(resCpCreate.body.id, 'checkpoint-1');
+
+    // GET list checkpoints
+    const resCpList = await fetchJson(`http://127.0.0.1:${port}/api/contents/cp_test.ipynb/checkpoints`);
+    assert.strictEqual(resCpList.status, 200);
+    assert.strictEqual(resCpList.body.length, 1);
+
+    // POST restore checkpoint
+    const resCpRestore = await fetchJson(`http://127.0.0.1:${port}/api/contents/cp_test.ipynb/checkpoints/checkpoint-1`, {
+      method: 'POST'
+    });
+    assert.strictEqual(resCpRestore.status, 204);
+
+    // DELETE checkpoint
+    const resCpDel = await fetchJson(`http://127.0.0.1:${port}/api/contents/cp_test.ipynb/checkpoints/checkpoint-1`, {
+      method: 'DELETE'
+    });
+    assert.strictEqual(resCpDel.status, 204);
+  } finally {
+    server.close();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('startLocalServer routes /api/contents requests to FileContentsManager', async () => {
   const tmpDir = createTmpDir();
   const jupyterliteDir = path.join(tmpDir, 'jupyterlite');

@@ -29,6 +29,67 @@ const MIME_TYPES = {
 
 const DEFAULT_PORT = 58888;
 
+/**
+ * ネットワーク許可ポリシーに基づき CSP ヘッダー文字列を構築する
+ */
+function buildCspHeader(isExternalNetworkAllowed) {
+  const allowExternal = typeof isExternalNetworkAllowed === 'function'
+    ? isExternalNetworkAllowed()
+    : Boolean(isExternalNetworkAllowed);
+
+  const connectSrc = allowExternal
+    ? "* 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
+    : "'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+  const scriptSrc = allowExternal
+    ? "* 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
+    : "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
+  const imgSrc = allowExternal
+    ? "* 'self' data: blob:"
+    : "'self' data: blob:";
+
+  return `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1; script-src ${scriptSrc}; connect-src ${connectSrc}; img-src ${imgSrc};`;
+}
+
+/**
+ * jupyter-lite.json にユーザー設定オーバーライドおよびプリロードパッケージ設定を注入する
+ */
+function injectJupyterLiteConfig(filePath, currentDataDir, configFilePath) {
+  const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const userOverrides = loadOverrides(currentDataDir) || {};
+
+  baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
+  const existingOverrides = baseContent['jupyter-config-data']['settingsOverrides'] || {};
+  const existingLitePluginSettings = baseContent['jupyter-config-data']['litePluginSettings'] || {};
+
+  const { pyodidePackages, piplitePackages } = getCategorizedPreloadPackages(configFilePath);
+  const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
+
+  const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || existingLitePluginSettings[kernelPluginId] || {};
+  const existingLoadPyodideOptions = existingKernelSettings.loadPyodideOptions || {};
+
+  const mergedKernelSettings = {
+    ...existingKernelSettings,
+    loadPyodideOptions: {
+      ...existingLoadPyodideOptions,
+      packages: pyodidePackages
+    },
+    piplitePreloadPackages: piplitePackages
+  };
+
+  baseContent['jupyter-config-data']['settingsOverrides'] = {
+    ...existingOverrides,
+    ...userOverrides,
+    [kernelPluginId]: mergedKernelSettings
+  };
+
+  baseContent['jupyter-config-data']['litePluginSettings'] = {
+    ...existingLitePluginSettings,
+    [kernelPluginId]: mergedKernelSettings
+  };
+
+  return JSON.stringify(baseContent, null, 2);
+}
+
 function resolveSafePath(rootDir, relativePath) {
   let rel = relativePath;
   if (rel === '/' || rel === '') {
@@ -51,6 +112,55 @@ function resolveSafePath(rootDir, relativePath) {
 }
 
 /**
+ * リクエストボディから JSON を非同期で読み込むヘルパー関数
+ */
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * チェックポイント REST ルーティング処理関数
+ */
+async function handleCheckpointsRoute(req, res, contentsManager, checkpointMatch) {
+  const targetApiPath = checkpointMatch[1] || '';
+  const checkpointId = checkpointMatch[2];
+
+  if (req.method === 'GET') {
+    const list = await contentsManager.listCheckpoints(targetApiPath);
+    res.writeHead(200);
+    return res.end(JSON.stringify(list));
+  } else if (req.method === 'POST') {
+    let body = {};
+    try { body = await readJsonBody(req); } catch (e) {}
+    if (checkpointId) {
+      await contentsManager.restoreCheckpoint(targetApiPath, checkpointId);
+      res.writeHead(204);
+      return res.end();
+    } else {
+      const cp = await contentsManager.createCheckpoint(targetApiPath);
+      res.writeHead(201);
+      return res.end(JSON.stringify(cp));
+    }
+  } else if (req.method === 'DELETE' && checkpointId) {
+    await contentsManager.deleteCheckpoint(targetApiPath, checkpointId);
+    res.writeHead(204);
+    return res.end();
+  }
+}
+
+/**
  * REST API /api/contents リクエストを処理する関数
  */
 async function handleContentsApi(req, res, contentsManager, parsedUrl) {
@@ -69,53 +179,11 @@ async function handleContentsApi(req, res, contentsManager, parsedUrl) {
     return res.end();
   }
 
-  // リクエストボディの読み込みヘルパー
-  const readJsonBody = () => new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      if (!body) return resolve({});
-      try {
-        resolve(JSON.parse(body));
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
-
   try {
     // 1. チェックポイント ルーティング
-    // パス末尾の /checkpoints または /checkpoints/<checkpoint_id> にマッチ
     const checkpointMatch = cleanApiPath.match(/^(?:(.*)\/)?checkpoints(?:\/([^/]+))?$/);
     if (checkpointMatch) {
-      const targetApiPath = checkpointMatch[1] || '';
-      const checkpointId = checkpointMatch[2];
-
-      if (req.method === 'GET') {
-        const list = await contentsManager.listCheckpoints(targetApiPath);
-        res.writeHead(200);
-        return res.end(JSON.stringify(list));
-      } else if (req.method === 'POST') {
-        // Restore もしくは Create
-        let body = {};
-        try { body = await readJsonBody(); } catch (e) {}
-        if (checkpointId) {
-          // Restore
-          await contentsManager.restoreCheckpoint(targetApiPath, checkpointId);
-          res.writeHead(204);
-          return res.end();
-        } else {
-          // Create
-          const cp = await contentsManager.createCheckpoint(targetApiPath);
-          res.writeHead(201);
-          return res.end(JSON.stringify(cp));
-        }
-      } else if (req.method === 'DELETE' && checkpointId) {
-        await contentsManager.deleteCheckpoint(targetApiPath, checkpointId);
-        res.writeHead(204);
-        return res.end();
-      }
+      return await handleCheckpointsRoute(req, res, contentsManager, checkpointMatch);
     }
 
     // 2. 通常の Contents API ルーティング
@@ -132,14 +200,12 @@ async function handleContentsApi(req, res, contentsManager, parsedUrl) {
       res.writeHead(200);
       return res.end(JSON.stringify(model));
     } else if (req.method === 'POST') {
-      const body = await readJsonBody();
+      const body = await readJsonBody(req);
       if (body.copy_from) {
-        // コピー操作
         const model = await contentsManager.copy(body.copy_from, cleanApiPath);
         res.writeHead(201);
         return res.end(JSON.stringify(model));
       } else {
-        // new_untitled 操作
         const model = await contentsManager.newUntitled(cleanApiPath, {
           type: body.type || 'notebook',
           ext: body.ext || ''
@@ -148,12 +214,12 @@ async function handleContentsApi(req, res, contentsManager, parsedUrl) {
         return res.end(JSON.stringify(model));
       }
     } else if (req.method === 'PUT') {
-      const body = await readJsonBody();
+      const body = await readJsonBody(req);
       const model = await contentsManager.save(body, cleanApiPath);
       res.writeHead(200);
       return res.end(JSON.stringify(model));
     } else if (req.method === 'PATCH') {
-      const body = await readJsonBody();
+      const body = await readJsonBody(req);
       if (body.path) {
         const model = await contentsManager.rename(cleanApiPath, body.path);
         res.writeHead(200);
@@ -176,6 +242,49 @@ async function handleContentsApi(req, res, contentsManager, parsedUrl) {
     res.writeHead(statusCode);
     return res.end(JSON.stringify({ message: err.message }));
   }
+}
+
+/**
+ * 静的ファイル（HTML, JS, CSS, jupyter-lite.json 等）を配信する処理関数
+ */
+function serveStaticFile(req, res, rootDir, relativePath, currentDataDir, configFilePath, isExternalNetworkAllowed) {
+  const filePath = resolveSafePath(rootDir, relativePath);
+
+  if (!filePath) {
+    logger.log('HTTP 403', `Access Denied: ${relativePath}`);
+    res.writeHead(403);
+    return res.end('Access Denied');
+  }
+
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    logger.log('HTTP 404', `Not Found: ${relativePath}`);
+    res.writeHead(404);
+    return res.end(`Not Found: ${relativePath}`);
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Content-Security-Policy': buildCspHeader(isExternalNetworkAllowed),
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'credentialless',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'Cache-Control': 'no-cache'
+  });
+
+  if (path.basename(filePath) === 'jupyter-lite.json') {
+    try {
+      const jsonStr = injectJupyterLiteConfig(filePath, currentDataDir, configFilePath);
+      return res.end(jsonStr);
+    } catch (err) {
+      logger.log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);
+    }
+  }
+
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 }
 
 function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT, options = {}) {
@@ -202,86 +311,7 @@ function startLocalServer(rootDir, currentDataDir, preferredPort = DEFAULT_PORT,
           return await handleContentsApi(req, res, contentsManager, parsedUrl);
         }
 
-        const filePath = resolveSafePath(rootDir, relativePath);
-
-        if (!filePath) {
-          logger.log('HTTP 403', `Access Denied: ${relativePath}`);
-          res.writeHead(403);
-          return res.end('Access Denied');
-        }
-
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-          logger.log('HTTP 404', `Not Found: ${relativePath}`);
-          res.writeHead(404);
-          return res.end(`Not Found: ${relativePath}`);
-        }
-
-        const ext = path.extname(filePath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-        const allowExternal = typeof isExternalNetworkAllowed === 'function' ? isExternalNetworkAllowed() : false;
-        const connectSrc = allowExternal
-          ? "* 'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
-          : "'self' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
-        const scriptSrc = allowExternal
-          ? "* 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*"
-          : "'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1:*";
-        const imgSrc = allowExternal
-          ? "* 'self' data: blob:"
-          : "'self' data: blob:";
-
-        res.writeHead(200, {
-          'Content-Type': contentType,
-          'Content-Security-Policy': `default-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://127.0.0.1:* ws://127.0.0.1; script-src ${scriptSrc}; connect-src ${connectSrc}; img-src ${imgSrc};`,
-          'Cross-Origin-Opener-Policy': 'same-origin',
-          'Cross-Origin-Embedder-Policy': 'credentialless',
-          'Cross-Origin-Resource-Policy': 'cross-origin',
-          'Cache-Control': 'no-cache'
-        });
-
-        if (path.basename(filePath) === 'jupyter-lite.json') {
-          try {
-            const baseContent = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const userOverrides = loadOverrides(currentDataDir) || {};
-
-            baseContent['jupyter-config-data'] = baseContent['jupyter-config-data'] || {};
-            const existingOverrides = baseContent['jupyter-config-data']['settingsOverrides'] || {};
-            const existingLitePluginSettings = baseContent['jupyter-config-data']['litePluginSettings'] || {};
-
-            const { pyodidePackages, piplitePackages } = getCategorizedPreloadPackages(configFilePath);
-            const kernelPluginId = '@jupyterlite/pyodide-kernel-extension:kernel';
-
-            const existingKernelSettings = userOverrides[kernelPluginId] || existingOverrides[kernelPluginId] || existingLitePluginSettings[kernelPluginId] || {};
-            const existingLoadPyodideOptions = existingKernelSettings.loadPyodideOptions || {};
-
-            const mergedKernelSettings = {
-              ...existingKernelSettings,
-              loadPyodideOptions: {
-                ...existingLoadPyodideOptions,
-                packages: pyodidePackages
-              },
-              piplitePreloadPackages: piplitePackages
-            };
-
-            baseContent['jupyter-config-data']['settingsOverrides'] = {
-              ...existingOverrides,
-              ...userOverrides,
-              [kernelPluginId]: mergedKernelSettings
-            };
-
-            baseContent['jupyter-config-data']['litePluginSettings'] = {
-              ...existingLitePluginSettings,
-              [kernelPluginId]: mergedKernelSettings
-            };
-
-            return res.end(JSON.stringify(baseContent, null, 2));
-          } catch (err) {
-            logger.log('SERVER ERROR', `Failed to inject overrides: ${err.message}`);
-          }
-        }
-
-        const stream = fs.createReadStream(filePath);
-        stream.pipe(res);
+        serveStaticFile(req, res, rootDir, relativePath, currentDataDir, configFilePath, isExternalNetworkAllowed);
       } catch (err) {
         logger.log('SERVER ERROR', `${err.message}`);
         res.writeHead(500);
