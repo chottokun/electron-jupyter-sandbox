@@ -9,11 +9,14 @@ on:
       - main
   workflow_dispatch:
 
-jobs:
-  build:
-    name: Build & Verify
-    runs-on: ubuntu-latest
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  security-and-lint:
+    name: Security & Integrity Audit
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,20 +41,107 @@ jobs:
       - name: Security audit (npm)
         run: npm audit --audit-level=high
 
-      - name: Build project assets (Extensions + JupyterLite)
-        run: npm run build
+      - name: Security audit (Python / uv)
+        run: uv run pip-audit
 
-      - name: Run unit tests
+      - name: Verify wheel integrity
+        run: npm run wheels:verify
+
+  unit-and-regression-tests:
+    name: Unit & Adversarial Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync
+
+      - name: Run policy simulation test
+        run: npm run test:simulation
+
+      - name: Run unit & adversarial tests
         run: npm test
 
       - name: Run wheel tests (pytest)
         run: npm run test:wheels
 
-      - name: Verify wheel integrity
-        run: npm run wheels:verify
+  build-and-verify:
+    name: Build & Artifacts Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync
+
+      - name: Build project assets (Extensions + JupyterLite)
+        run: npm run build
 
       - name: Verify build artifacts
         run: |
           test -f jupyterlite/index.html || (echo "Missing jupyterlite/index.html" && exit 1)
           test -f jupyterlite/jupyter-lite.json || (echo "Missing jupyterlite/jupyter-lite.json" && exit 1)
           echo "All build artifacts verified successfully."
+
+  e2e-playwright:
+    name: E2E Browser & Kernel Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install uv (Python package manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          uv sync
+
+      - name: Install Playwright Chromium with system dependencies
+        run: uv run playwright install --with-deps chromium
+
+      - name: Build project assets
+        run: npm run build
+
+      - name: Run E2E runner (JupyterLab & Pyodide execution)
+        run: npm run test:e2e:runner

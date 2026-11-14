@@ -29,7 +29,7 @@ test('Pyodide kernel preloads packages without piplite.install', { timeout: 1200
     const pythonScript = path.join(__dirname, 'kernel-preload.e2e.py');
 
     await new Promise((resolve, reject) => {
-      const child = spawn('python3', [pythonScript, String(port)], {
+      const child = spawn('uv', ['run', 'python', pythonScript, String(port)], {
         encoding: 'utf-8'
       });
 

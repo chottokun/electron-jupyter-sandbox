@@ -29,7 +29,7 @@ test('Playbook recipes execute seamlessly without piplite.install or ModuleNotFo
     const pythonScript = path.join(__dirname, 'playbook-execution.e2e.py');
 
     await new Promise((resolve, reject) => {
-      const child = spawn('python3', [pythonScript, String(port)], {
+      const child = spawn('uv', ['run', 'python', pythonScript, String(port)], {
         encoding: 'utf-8'
       });
 
