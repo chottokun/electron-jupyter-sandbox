@@ -2,18 +2,38 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
   id-token: write
   attestations: write
 
 jobs:
+  release-please:
+    name: Release Please (Auto Version Bump & PR)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   build-and-release:
     name: Build and Release Windows Binaries
+    needs: [release-please]
+    if: always() && (needs.release-please.outputs.release_created == 'true' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: windows-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -22,6 +42,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -84,9 +106,14 @@ jobs:
       - name: Resolve Release Tag
         id: resolve_tag
         shell: pwsh
+        env:
+          RP_TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
-          if ($env:GITHUB_REF_TYPE -eq "tag") {
+          if (-not [string]::IsNullOrEmpty($env:RP_TAG)) {
+            $tag = $env:RP_TAG
+            $isPrerelease = $tag -match "alpha|beta|rc|snapshot|test"
+          } elseif ($env:GITHUB_REF_TYPE -eq "tag") {
             $tag = $env:GITHUB_REF_NAME
             $isPrerelease = $tag -match "alpha|beta|rc|snapshot|test"
           } else {
@@ -102,6 +129,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ env.IS_PRERELEASE == 'True' }}
+          append_body: true
           files: |
             dist/*.exe
             dist/*.zip
