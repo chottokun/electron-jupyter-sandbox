@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  security-and-lint:
-    name: Security & Integrity Audit
+  security-audit:
+    name: Security Audit (npm & Python)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -44,44 +44,8 @@ jobs:
       - name: Security audit (Python / uv)
         run: uv run pip-audit
 
-      - name: Verify wheel integrity
-        run: npm run wheels:verify
-
   unit-and-regression-tests:
-    name: Unit & Adversarial Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Install uv (Python package manager)
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          uv sync
-
-      - name: Run policy simulation test
-        run: npm run test:simulation
-
-      - name: Run unit & adversarial tests
-        run: npm test
-
-      - name: Run wheel tests (pytest)
-        run: npm run test:wheels
-
-  build-and-verify:
-    name: Build & Artifacts Verification
+    name: Unit, Regression & Wheel Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -107,11 +71,22 @@ jobs:
       - name: Build project assets (Extensions + JupyterLite)
         run: npm run build
 
-      - name: Verify build artifacts
+      - name: Verify build artifacts exist
         run: |
           test -f jupyterlite/index.html || (echo "Missing jupyterlite/index.html" && exit 1)
           test -f jupyterlite/jupyter-lite.json || (echo "Missing jupyterlite/jupyter-lite.json" && exit 1)
-          echo "All build artifacts verified successfully."
+
+      - name: Verify wheel integrity
+        run: npm run wheels:verify
+
+      - name: Run policy simulation test
+        run: npm run test:simulation
+
+      - name: Run unit & adversarial tests
+        run: npm test
+
+      - name: Run wheel tests (pytest)
+        run: npm run test:wheels
 
   e2e-playwright:
     name: E2E Browser & Kernel Verification
@@ -143,5 +118,5 @@ jobs:
       - name: Build project assets
         run: npm run build
 
-      - name: Run E2E runner (JupyterLab & Pyodide execution)
+      - name: Run E2E runner (JupyterLab UI & Pyodide execution)
         run: npm run test:e2e:runner
