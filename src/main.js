@@ -2,7 +2,17 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const { saveConfig, getResolvedDataDir, isExternalNetworkAllowed, setExternalNetworkAllowed, isPreloadPackageEnabled, setPreloadPackageEnabled } = require('./config');
+const {
+  saveConfig,
+  getResolvedDataDir,
+  isExternalNetworkAllowed,
+  setExternalNetworkAllowed,
+  isPreloadPackageEnabled,
+  setPreloadPackageEnabled,
+  setPreloadPackages,
+  getWindowBounds,
+  saveWindowBounds
+} = require('./config');
 const { logger } = require('./logger');
 const { getSettingsDir, getOverridesPath } = require('./settings');
 const { startLocalServer } = require('./server');
@@ -136,9 +146,9 @@ async function changeDataDirectory(parentWin) {
 async function handleImportFile(parentWin) {
   const { canceled, filePaths } = await dialog.showOpenDialog(parentWin, {
     title: 'インポートするノートブック / ファイルを選択',
-    properties: ['openFile'],
+    properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'Jupyter Notebook / Python / Data', extensions: ['ipynb', 'py', 'csv', 'json', 'txt'] },
+      { name: 'Jupyter Notebook / Python / Data', extensions: ['ipynb', 'py', 'csv', 'xlsx', 'xls', 'docx', 'pptx', 'pdf', 'json', 'txt', 'md'] },
       { name: 'すべてのファイル', extensions: ['*'] }
     ]
   });
@@ -146,16 +156,51 @@ async function handleImportFile(parentWin) {
   if (canceled || filePaths.length === 0) return;
 
   try {
-    const filePath = filePaths[0];
-    const fileName = path.basename(filePath);
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const targetDir = path.join(getResolvedDataDir(appRootDir, configFilePath), 'notebooks');
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const importedNames = [];
+    let firstNotebook = null;
+
+    for (const srcPath of filePaths) {
+      const ext = path.extname(srcPath);
+      const base = path.basename(srcPath, ext);
+      let destName = `${base}${ext}`;
+      const resolvedSrc = path.resolve(srcPath);
+      let destPath = path.join(targetDir, destName);
+
+      // すでに別パスから同名ファイルが存在する場合は上書き事故を防ぐため連番を付与
+      if (fs.existsSync(destPath) && path.resolve(destPath) !== resolvedSrc) {
+        let counter = 1;
+        while (fs.existsSync(path.join(targetDir, `${base}_${counter}${ext}`))) {
+          counter++;
+        }
+        destName = `${base}_${counter}${ext}`;
+        destPath = path.join(targetDir, destName);
+      }
+
+      if (path.resolve(destPath) !== resolvedSrc) {
+        fs.copyFileSync(srcPath, destPath);
+      }
+      importedNames.push(destName);
+      if (!firstNotebook && ext.toLowerCase() === '.ipynb') {
+        firstNotebook = destName;
+      }
+      logger.log('MAIN', `File imported to notebooks dir: ${srcPath} -> ${destPath}`, app.isPackaged, currentDataDir);
+    }
+
+    const openFile = firstNotebook || (importedNames.length === 1 ? importedNames[0] : undefined);
 
     if (parentWin && !parentWin.isDestroyed()) {
-      parentWin.webContents.send('app:import-file', { fileName, content, path: filePath });
+      parentWin.webContents.send('app:file-imported', {
+        fileNames: importedNames,
+        openFile
+      });
     }
-    logger.log('MAIN', `File imported: ${filePath}`, app.isPackaged, currentDataDir);
   } catch (err) {
-    dialog.showErrorBox('インポートエラー', `ファイルの読み込みに失敗しました: ${err.message}`);
+    dialog.showErrorBox('インポートエラー', `ファイルのインポートに失敗しました: ${err.message}`);
   }
 }
 
@@ -181,10 +226,11 @@ let mainWindow = null;
 
 function createWindow(port) {
   const iconPath = path.resolve(__dirname, '../build/icon.png');
+  const savedBounds = getWindowBounds(configFilePath);
 
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 850,
+  const windowOptions = {
+    width: savedBounds.width,
+    height: savedBounds.height,
     title: 'Electron Jupyter Sandbox',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
@@ -198,7 +244,30 @@ function createWindow(port) {
       partition: 'persist:jupyter-data',
       preload: path.join(__dirname, 'preload.js')
     }
-  });
+  };
+
+  if (typeof savedBounds.x === 'number' && typeof savedBounds.y === 'number') {
+    windowOptions.x = savedBounds.x;
+    windowOptions.y = savedBounds.y;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
+
+  if (savedBounds.isMaximized) {
+    mainWindow.maximize();
+  }
+
+  const persistWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const isMaximized = mainWindow.isMaximized();
+    const normalBounds = isMaximized ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+    saveWindowBounds(configFilePath, {
+      ...normalBounds,
+      isMaximized
+    });
+  };
+
+  mainWindow.on('close', persistWindowState);
 
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     const levelStr = level === 3 ? 'ERROR' : level === 2 ? 'WARN' : 'LOG';
@@ -221,27 +290,48 @@ function createWindow(port) {
     }
   });
 
-  createApplicationMenu(mainWindow, {
-    changeDataDirectory,
-    getResolvedDataDir: () => getResolvedDataDir(appRootDir, configFilePath),
-    getNotebooksDir: () => path.join(getResolvedDataDir(appRootDir, configFilePath), 'notebooks'),
-    getOverridesPath: () => getOverridesPath(currentDataDir),
-    getSettingsDir: () => getSettingsDir(currentDataDir),
-    getLogPath: () => logger.getLogPath(currentDataDir),
-    getLogDir: () => logger.getLogDir(currentDataDir),
-    handleImportFile,
-    handleExportFile,
-    isExternalNetworkAllowed: () => isExternalNetworkAllowed(configFilePath),
-    toggleExternalNetwork: async (newVal) => {
-      setExternalNetworkAllowed(configFilePath, newVal);
-      logger.log('SECURITY', `外部ネットワーク設定を更新しました: ${newVal ? '許可' : '遮断'}`, app.isPackaged, currentDataDir);
-    },
-    isPreloadPackageEnabled: (pkgName) => isPreloadPackageEnabled(configFilePath, pkgName),
-    togglePreloadPackage: async (pkgName, enabled) => {
-      setPreloadPackageEnabled(configFilePath, pkgName, enabled);
-      logger.log('PRELOAD', `プリロードパッケージ設定を更新しました: ${pkgName} -> ${enabled ? '有効' : '無効'}`, app.isPackaged, currentDataDir);
-    }
-  });
+  const buildAppMenu = () => {
+    createApplicationMenu(mainWindow, {
+      changeDataDirectory,
+      getResolvedDataDir: () => getResolvedDataDir(appRootDir, configFilePath),
+      getNotebooksDir: () => path.join(getResolvedDataDir(appRootDir, configFilePath), 'notebooks'),
+      getOverridesPath: () => getOverridesPath(currentDataDir),
+      getSettingsDir: () => getSettingsDir(currentDataDir),
+      getLogPath: () => logger.getLogPath(currentDataDir),
+      getLogDir: () => logger.getLogDir(currentDataDir),
+      handleImportFile,
+      handleExportFile,
+      isExternalNetworkAllowed: () => isExternalNetworkAllowed(configFilePath),
+      toggleExternalNetwork: async (newVal) => {
+        setExternalNetworkAllowed(configFilePath, newVal);
+        logger.log('SECURITY', `外部ネットワーク設定を更新しました: ${newVal ? '許可' : '遮断'}`, app.isPackaged, currentDataDir);
+      },
+      isPreloadPackageEnabled: (pkgName) => isPreloadPackageEnabled(configFilePath, pkgName),
+      togglePreloadPackage: async (pkgName, enabled) => {
+        setPreloadPackageEnabled(configFilePath, pkgName, enabled);
+        logger.log('PRELOAD', `プリロードパッケージ設定を更新しました: ${pkgName} -> ${enabled ? '有効' : '無効'}`, app.isPackaged, currentDataDir);
+      },
+      applyPreloadPreset: async (packages) => {
+        setPreloadPackages(configFilePath, packages);
+        logger.log('PRELOAD', `プリロードプリセットを適用しました: ${packages.join(', ')}`, app.isPackaged, currentDataDir);
+        buildAppMenu();
+        const reloadChoice = await dialog.showMessageBox(mainWindow, {
+          type: 'question',
+          buttons: ['今すぐ再読み込み', 'あとで手動で再読み込み'],
+          defaultId: 0,
+          cancelId: 1,
+          title: 'プリセット設定の完了',
+          message: `ライブラリプリセット (${packages.length} 件) を適用しました。`,
+          detail: 'カーネル起動時のライブラリ設定を反映するには、ページを再読み込みしてください。今すぐ再読み込みしますか？'
+        });
+        if (reloadChoice.response === 0 && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.reload();
+        }
+      },
+      getAppVersion: () => app.getVersion()
+    });
+  };
+  buildAppMenu();
   setupContextMenu(mainWindow);
 
   mainWindow.loadURL(`http://127.0.0.1:${port}/lab/index.html`);
@@ -326,6 +416,22 @@ ipcMain.handle('dialog:saveFile', async (event, { defaultName, data }) => {
     return { success: true, filePath };
   }
   return { success: false };
+});
+
+ipcMain.handle('dialog:completeExportFile', async (event, { targetPath, content, format }) => {
+  try {
+    if (!targetPath) return { success: false };
+    if (format === 'base64') {
+      fs.writeFileSync(targetPath, Buffer.from(content || '', 'base64'));
+    } else {
+      fs.writeFileSync(targetPath, String(content || ''), 'utf-8');
+    }
+    logger.log('MAIN', `File exported to: ${targetPath}`, app.isPackaged, currentDataDir);
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    dialog.showErrorBox('エクスポートエラー', `ファイルの保存に失敗しました: ${err.message}`);
+    return { success: false, error: err.message };
+  }
 });
 
 app.on('window-all-closed', () => {

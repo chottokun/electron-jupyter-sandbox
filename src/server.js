@@ -69,6 +69,7 @@ function injectJupyterLiteConfig(filePath, currentDataDir, configFilePath) {
 
   const mergedKernelSettings = {
     ...existingKernelSettings,
+    pyodideUrl: existingKernelSettings.pyodideUrl || './static/pyodide/pyodide.mjs',
     loadPyodideOptions: {
       ...existingLoadPyodideOptions,
       packages: pyodidePackages
@@ -96,9 +97,11 @@ function resolveSafePath(rootDir, relativePath) {
     rel = '/lab/index.html';
   }
 
-  // JupyterLab が /lab/ 配下から ./pypi/ を相対要求した場合へのルーティング対応
+  // JupyterLab が /lab/ 配下から ./pypi/ または ./static/ を相対要求した場合へのルーティング対応
   if (rel.startsWith('/lab/pypi/')) {
     rel = rel.replace('/lab/pypi/', '/pypi/');
+  } else if (rel.startsWith('/lab/static/')) {
+    rel = rel.replace('/lab/static/', '/static/');
   }
 
   const normalizedRel = path.normalize(rel).replace(/^(\.\.[\/\\])+/, '');

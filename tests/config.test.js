@@ -17,6 +17,9 @@ const {
   getPreloadPackages,
   isPreloadPackageEnabled,
   setPreloadPackageEnabled,
+  setPreloadPackages,
+  getWindowBounds,
+  saveWindowBounds,
   getCategorizedPreloadPackages
 } = require('../src/config');
 
@@ -162,6 +165,65 @@ test('getCategorizedPreloadPackages handles dynamic manifest and sanitizes inval
   const categorized = getCategorizedPreloadPackages(configFilePath, customManifestPath);
   assert.deepStrictEqual(categorized.pyodidePackages, ['matplotlib', 'japanize-noto-sans-jp']);
   assert.deepStrictEqual(categorized.piplitePackages, ['custom-local-pkg']);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('setPreloadPackages batch updates and sanitizes package list', () => {
+  const tmpDir = createTmpDir();
+  const configFilePath = path.join(tmpDir, 'config.json');
+
+  const ok = setPreloadPackages(configFilePath, [
+    'matplotlib',
+    'pandas',
+    'matplotlib',
+    'invalid;pkg',
+    'openpyxl'
+  ]);
+  assert.strictEqual(ok, true);
+  assert.deepStrictEqual(getPreloadPackages(configFilePath), ['matplotlib', 'pandas', 'openpyxl']);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('getWindowBounds and saveWindowBounds persist and validate window dimensions', () => {
+  const tmpDir = createTmpDir();
+  const configFilePath = path.join(tmpDir, 'config.json');
+
+  // Default bounds
+  assert.deepStrictEqual(getWindowBounds(configFilePath), {
+    width: 1280,
+    height: 850,
+    isMaximized: false
+  });
+
+  // Save valid bounds
+  saveWindowBounds(configFilePath, {
+    width: 1600,
+    height: 950,
+    x: 100,
+    y: 50,
+    isMaximized: true
+  });
+  assert.deepStrictEqual(getWindowBounds(configFilePath), {
+    width: 1600,
+    height: 950,
+    x: 100,
+    y: 50,
+    isMaximized: true
+  });
+
+  // Invalid too-small bounds fallback to default dimensions
+  saveWindowBounds(configFilePath, {
+    width: 100,
+    height: 100,
+    isMaximized: false
+  });
+  assert.deepStrictEqual(getWindowBounds(configFilePath), {
+    width: 1280,
+    height: 850,
+    isMaximized: false
+  });
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

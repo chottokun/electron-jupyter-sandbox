@@ -25,7 +25,9 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     isExternalNetworkAllowed = () => false,
     toggleExternalNetwork = async () => {},
     isPreloadPackageEnabled = () => false,
-    togglePreloadPackage = async () => {}
+    togglePreloadPackage = async () => {},
+    applyPreloadPreset = async () => {},
+    getAppVersion = () => (typeof app.getVersion === 'function' ? app.getVersion() : '2.0.1')
   } = handlers;
 
   const createPackageCheckbox = (pkgName, label) => ({
@@ -159,6 +161,47 @@ function createApplicationMenu(mainWindow, handlers = {}) {
     {
       label: 'ライブラリ',
       submenu: [
+        {
+          label: '🔄 現在のライブラリ設定を反映して再読み込み',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.reload();
+            }
+          }
+        },
+        {
+          label: '⚡ プリセット一括設定',
+          submenu: [
+            {
+              label: '📊 データ分析・オフィス標準セット (推奨)',
+              click: async () => {
+                await applyPreloadPreset(['japanize-noto-sans-jp', 'matplotlib', 'pandas', 'numpy', 'openpyxl']);
+              }
+            },
+            {
+              label: '🏢 オフィス文書処理フルセット (Excel / Word / PPT / PDF)',
+              click: async () => {
+                await applyPreloadPreset([
+                  'japanize-noto-sans-jp',
+                  'openpyxl',
+                  'xlsxwriter',
+                  'python-docx',
+                  'python-pptx',
+                  'pypdf',
+                  'reportlab',
+                  'tabulate'
+                ]);
+              }
+            },
+            {
+              label: '🪶 最小構成 (高速起動: 日本語フォント + Matplotlib + OpenPyXL)',
+              click: async () => {
+                await applyPreloadPreset(['japanize-noto-sans-jp', 'matplotlib', 'openpyxl']);
+              }
+            }
+          ]
+        },
+        { type: 'separator' },
         { label: '--- ローカル追加パッケージ (wheels) ---', enabled: false },
         createPackageCheckbox('japanize-noto-sans-jp', 'japanize-noto-sans-jp (日本語フォント・設定)'),
         createPackageCheckbox('seaborn', 'seaborn (統計データ可視化)'),
@@ -330,11 +373,12 @@ function createApplicationMenu(mainWindow, handlers = {}) {
         {
           label: 'バージョン・環境情報',
           click: () => {
+            const ver = getAppVersion();
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'Electron Jupyter Sandbox',
-              message: 'Electron Jupyter Sandbox v1.0.0',
-              detail: `現在のデータ保存先:\n${getResolvedDataDir()}\n\nログ保存先:\n${getLogPath()}\n\n・完全隔離型 WebAssembly (Pyodide) 実行環境\n・オフライン保証 (外部通信完全遮断)`
+              message: `Electron Jupyter Sandbox v${ver}`,
+              detail: `現在のデータ保存先:\n${getResolvedDataDir()}\n\nログ保存先:\n${getLogPath()}\n\n・完全隔離型 WebAssembly (Pyodide) 実行環境\n・ローカルフォルダ直結 & 自動双方向ファイル同期\n・オフライン保証 (外部通信遮断 / ポリシー制御)`
             });
           }
         }

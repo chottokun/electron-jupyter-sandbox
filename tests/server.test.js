@@ -62,6 +62,11 @@ test('path traversal check resolves safe paths inside rootDir and blocks outside
   const wheelPath = resolveSafePath(subDir, '/lab/pypi/pkg.whl');
   assert.strictEqual(wheelPath, path.join(pypiDir, 'pkg.whl'));
 
+  const staticDir = path.join(subDir, 'static', 'pyodide');
+  fs.mkdirSync(staticDir, { recursive: true });
+  const pyodidePath = resolveSafePath(subDir, '/lab/static/pyodide/pyodide.mjs');
+  assert.strictEqual(pyodidePath, path.join(staticDir, 'pyodide.mjs'));
+
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -101,12 +106,14 @@ test('startLocalServer performs dual-injection into both settingsOverrides and l
     // 1. settingsOverrides 検証
     const settingsOverrides = configData.settingsOverrides?.[kernelPluginId];
     assert.ok(settingsOverrides, 'settingsOverrides must contain kernel plugin config');
+    assert.strictEqual(settingsOverrides.pyodideUrl, './static/pyodide/pyodide.mjs');
     assert.deepStrictEqual(settingsOverrides.loadPyodideOptions.packages, ['matplotlib', 'pandas']);
     assert.deepStrictEqual(settingsOverrides.piplitePreloadPackages, ['japanize-noto-sans-jp', 'openpyxl']);
 
     // 2. litePluginSettings (Dual-Injection) 検証
     const litePluginSettings = configData.litePluginSettings?.[kernelPluginId];
     assert.ok(litePluginSettings, 'litePluginSettings must contain kernel plugin config');
+    assert.strictEqual(litePluginSettings.pyodideUrl, './static/pyodide/pyodide.mjs');
     assert.deepStrictEqual(litePluginSettings.loadPyodideOptions.packages, ['matplotlib', 'pandas']);
     assert.deepStrictEqual(litePluginSettings.piplitePreloadPackages, ['japanize-noto-sans-jp', 'openpyxl']);
 

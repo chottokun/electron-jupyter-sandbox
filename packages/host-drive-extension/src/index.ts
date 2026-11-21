@@ -226,6 +226,70 @@ const hostDrivePlugin: JupyterFrontEndPlugin<void> = {
     docManager.services.contents.addDrive(drive);
     (docManager.services.contents as any)._defaultDrive = drive;
     console.log('[HostDrive] Host Contents Drive successfully registered as primary default drive.');
+
+    // Electron ネイティブメニュー（インポート / エクスポート）との IPC 連携
+    const electronApp = (window as any).ElectronApp;
+    if (electronApp) {
+      if (typeof electronApp.onFileImported === 'function') {
+        electronApp.onFileImported(async (payload: { fileNames?: string[]; openFile?: string }) => {
+          try {
+            const browser = factory.tracker.currentWidget;
+            if (browser && browser.model) {
+              await browser.model.refresh();
+            }
+            if (payload?.openFile) {
+              await docManager.openOrReveal(payload.openFile);
+            }
+          } catch (err) {
+            console.error('[HostDrive] Failed to handle imported file:', err);
+          }
+        });
+      }
+
+      if (typeof electronApp.onRequestExportData === 'function') {
+        electronApp.onRequestExportData(async (payload: { targetPath?: string }) => {
+          if (!payload?.targetPath) return;
+          try {
+            const currentWidget = app.shell.currentWidget;
+            const context = currentWidget ? docManager.contextForWidget(currentWidget) : undefined;
+            let targetApiPath = context?.path;
+
+            if (!targetApiPath) {
+              const browser = factory.tracker.currentWidget;
+              const selected = browser?.selectedItems().next();
+              if (selected && !selected.done && selected.value) {
+                targetApiPath = selected.value.path;
+              }
+            }
+
+            if (!targetApiPath) {
+              targetApiPath = 'welcome.ipynb';
+            }
+
+            if (context && context.model.dirty) {
+              await context.save();
+            }
+
+            const model = await drive.get(targetApiPath, { content: true });
+            let exportContent: string;
+            let format: 'text' | 'base64' = 'text';
+
+            if (model.type === 'notebook' || model.format === 'json') {
+              exportContent = JSON.stringify(model.content, null, 1) + '\n';
+            } else if (model.format === 'base64') {
+              exportContent = String(model.content || '');
+              format = 'base64';
+            } else {
+              exportContent = String(model.content || '');
+            }
+
+            await electronApp.completeExportFile(payload.targetPath, exportContent, format);
+          } catch (err) {
+            console.error('[HostDrive] Failed to export active document:', err);
+          }
+        });
+      }
+    }
   }
 };
 

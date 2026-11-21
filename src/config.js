@@ -193,6 +193,55 @@ function setPreloadPackageEnabled(configFilePath, packageName, enabled) {
 }
 
 /**
+ * プリロードパッケージ一覧を一括更新
+ * @param {string} configFilePath
+ * @param {string[]} packages
+ * @returns {boolean}
+ */
+function setPreloadPackages(configFilePath, packages) {
+  if (!Array.isArray(packages)) return false;
+  const uniqueValid = [...new Set(packages.filter(isValidPackageName))];
+  return saveConfig(configFilePath, { preloadPackages: uniqueValid });
+}
+
+/**
+ * ウィンドウサイズ・状態をconfig.jsonから取得
+ * @param {string} configFilePath
+ * @returns {{ width: number, height: number, x?: number, y?: number, isMaximized?: boolean }}
+ */
+function getWindowBounds(configFilePath) {
+  const defaultBounds = { width: 1280, height: 850, isMaximized: false };
+  const config = loadConfig(configFilePath);
+  if (config && config.windowBounds && typeof config.windowBounds === 'object') {
+    const b = config.windowBounds;
+    const width = typeof b.width === 'number' && b.width >= 400 ? b.width : defaultBounds.width;
+    const height = typeof b.height === 'number' && b.height >= 300 ? b.height : defaultBounds.height;
+    const result = {
+      width,
+      height,
+      isMaximized: Boolean(b.isMaximized)
+    };
+    if (typeof b.x === 'number' && typeof b.y === 'number') {
+      result.x = b.x;
+      result.y = b.y;
+    }
+    return result;
+  }
+  return defaultBounds;
+}
+
+/**
+ * ウィンドウサイズ・状態をconfig.jsonへ保存
+ * @param {string} configFilePath
+ * @param {{ width: number, height: number, x?: number, y?: number, isMaximized?: boolean }} bounds
+ * @returns {boolean}
+ */
+function saveWindowBounds(configFilePath, bounds) {
+  if (!bounds || typeof bounds !== 'object') return false;
+  return saveConfig(configFilePath, { windowBounds: bounds });
+}
+
+/**
  * プリロード対象パッケージを Pyodide 標準パッケージと独自 wheel に分離して取得
  * @param {string} [configFilePath]
  * @param {string} [customManifestPath]
@@ -235,5 +284,8 @@ module.exports = {
   getPreloadPackages,
   isPreloadPackageEnabled,
   setPreloadPackageEnabled,
+  setPreloadPackages,
+  getWindowBounds,
+  saveWindowBounds,
   getCategorizedPreloadPackages
 };
